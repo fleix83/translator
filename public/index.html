@@ -96,6 +96,20 @@
             justify-content: center;
             color: var(--primary-color);
             transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        /* Ensure the icon is clickable */
+        .header-btn i {
+            cursor: pointer;
+            /* Makes sure the entire area is clickable */
+            display: block;
+            pointer-events: auto;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .header-btn:hover {
@@ -286,6 +300,7 @@
             justify-content: center;
             gap: 0.5rem;
             min-width: 90px;
+            height: 45px;
         }
         
         .send-btn:before {
@@ -625,6 +640,18 @@
             transition: all 0.3s ease;
         }
         
+        .customer-badge {
+            background-color: var(--customer-color);
+            border: 1px solid var(--customer-border);
+            color: var(--primary-dark);
+            font-weight: 600;
+            text-transform: none;
+        }
+        
+        .customer-badge i {
+            color: var(--primary-color);
+        }
+        
         .mode-indicator:before {
             font-family: 'Font Awesome 6 Free';
             font-weight: 900;
@@ -696,9 +723,11 @@
 </head>
 <body class="receiver-mode">
     <div class="header">
-        <h1>Translator</h1>
+        <div>
+            <img src="/GGG_Wegweiser.svg" alt="GGG Wegweiser Logo" style="height: 2.5rem; width: auto; filter: invert(38%) sepia(82%) saturate(1539%) hue-rotate(217deg) brightness(97%) contrast(101%);">
+        </div>
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span class="mode-indicator">Receiver Mode</span>
+            <span class="mode-indicator" id="modeIndicator"></span>
             <button class="header-btn settings-btn" id="settingsBtn">
                 <i class="fas fa-cog"></i>
             </button>
@@ -895,10 +924,16 @@
         function updateInterfaceMode() {
             document.body.className = state.userMode === 'customer' ? 'customer-mode' : 'receiver-mode';
             
-            // Add null check to prevent errors
-            const modeIndicator = document.querySelector('.mode-indicator');
+            // Update the mode indicator to show customer name if in customer mode
+            const modeIndicator = document.getElementById('modeIndicator');
             if (modeIndicator) {
-                modeIndicator.textContent = state.userMode === 'customer' ? 'Customer Mode' : 'Receiver Mode';
+                if (state.userMode === 'customer') {
+                    modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
+                    modeIndicator.className = 'mode-indicator customer-badge';
+                } else {
+                    modeIndicator.innerHTML = `<i class="fas fa-headset"></i> Receiver Mode`;
+                    modeIndicator.className = 'mode-indicator';
+                }
             }
         }
 
@@ -922,13 +957,24 @@
             }
         });
 
-        settingsBtn.addEventListener('click', () => {
+        // Get the settings icon element
+        const settingsIcon = settingsBtn.querySelector('i.fas.fa-cog');
+        
+        // Add click handler to both the button and the icon
+        function toggleSettingsPanel() {
             settingsPanel.classList.toggle('active');
             
             // Hide info panel if it's open
             if (document.getElementById('infoPanel').style.display === 'block') {
                 document.getElementById('infoPanel').style.display = 'none';
             }
+        }
+        
+        settingsBtn.addEventListener('click', toggleSettingsPanel);
+        // Add a separate event listener for the icon to ensure clicks on it work
+        settingsIcon.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent multiple triggers
+            toggleSettingsPanel();
         });
         
         // Info button event listener
@@ -1031,6 +1077,13 @@
             document.getElementById('customerNameInput').addEventListener('change', (e) => {
                 state.customerName = e.target.value || 'Customer';
                 saveSettings();
+                // Update mode indicator if we're in customer mode
+                if (state.userMode === 'customer') {
+                    const modeIndicator = document.getElementById('modeIndicator');
+                    if (modeIndicator) {
+                        modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
+                    }
+                }
                 // Update any existing customer messages in the UI
                 renderMessages();
             });
@@ -1251,7 +1304,8 @@
                 customerLanguage: state.customerLanguage,
                 baseLanguage: state.baseLanguage,
                 model: state.model,
-                autoModeDetection: state.autoModeDetection
+                autoModeDetection: state.autoModeDetection,
+                customerName: state.customerName
             }));
         }
 
@@ -1441,7 +1495,7 @@
         function getSenderDisplayName(sender) {
             switch (sender) {
                 case 'customer':
-                    return `Customer (${getLanguageName(state.customerLanguage)})`;
+                    return `${state.customerName} (${getLanguageName(state.customerLanguage)})`;
                 case 'claude':
                     return 'Translator';
                 case 'receiver':
