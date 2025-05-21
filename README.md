@@ -1,51 +1,80 @@
-# Translation Chat Interface
+# Translator
 
-A multilingual chat interface that facilitates communication between a customer speaking a foreign language and a receiver using a base language, with Claude AI acting as a translator.
+A real-time translation chat interface powered by Claude AI.
 
 ## Features
 
-- **Multilingual Support**: Translates between multiple languages
-- **Device Detection**: Automatically sets the appropriate mode based on screen size
-  - Mobile devices -> Customer mode (foreign language)
-  - Desktop devices -> Receiver mode (base language)
-- **Role-Based UI**: Different chat bubble styles for each participant
-- **Claude AI Integration**: Provides high-quality translations through the Claude API
+- Real-time translation between multiple languages
+- Support for Serbian, Albanian, Ukrainian, and many other languages
+- Voice input support (browser compatible)
+- Responsive design for both desktop and mobile devices
+- Simple, intuitive user interface
 
-## Setup Instructions
+## Development Setup
 
-1. Install dependencies:
-```
-npm install
-```
+### Prerequisites
 
-2. Start the server:
-```
-node server.js
-```
+- Node.js 14+ and npm
+- Claude API key
 
-3. Access the app at http://localhost:3000
+### Installation
 
-## How to Use
+1. Clone the repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Start the development server:
+   ```
+   npm run dev
+   ```
+4. Open http://localhost:3000 in your browser
 
-1. **Settings Configuration**: 
-   - Click the gear icon (⚙️) to open settings
-   - Enter your Claude API key
-   - Select your preferred languages
-   - Choose user mode (customer or receiver)
+## LAMP Server Deployment
 
-2. **Chat Flow**:
-   - **Customer** (foreign language) writes a message → Claude translates to base language
-   - **Receiver** (base language) reads translation, responds → Claude translates to foreign language
-   - Claude provides translations in both directions
+To deploy this application on a LAMP server (Linux, Apache, MySQL, PHP):
 
-## Technical Overview
+1. Make the deployment script executable:
+   ```
+   chmod +x deploy.sh
+   ```
 
-- **Frontend**: HTML, CSS, JavaScript (vanilla)
-- **Backend**: Node.js with Express
-- **API**: Claude by Anthropic for translation
-- **Data Storage**: Local storage for chat history and settings
+2. Run the deployment script:
+   ```
+   ./deploy.sh
+   ```
 
-## Requirements
+3. Copy the contents of the `dist` directory to your web server's document root or virtual host directory
 
-- Node.js
-- A Claude API key from Anthropic
+4. Configure your Apache server:
+   - Enable mod_rewrite
+   - Set AllowOverride to All for the directory in your Apache configuration
+
+   Example Apache configuration:
+   ```apache
+   <Directory /var/www/html/translator>
+       Options Indexes FollowSymLinks
+       AllowOverride All
+       Require all granted
+   </Directory>
+   ```
+
+5. Ensure PHP's cURL extension is enabled
+
+6. Visit your website and test the application
+
+## Configuration
+
+- Set your Claude API key in the settings panel
+- Choose your preferred languages for translation
+- Toggle between customer and receiver modes
+
+## Technologies Used
+
+- Frontend: HTML, CSS, JavaScript
+- Backend: Node.js/Express (Development) or PHP (LAMP Deployment)
+- API: Claude AI for language translation
+
+## License
+
+MIT
