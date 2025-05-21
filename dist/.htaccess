@@ -1,0 +1,13 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# API endpoint for Claude proxy
+RewriteRule ^api/claude$ api/claude.php [L]
+
+# API endpoint for test
+RewriteRule ^api/test$ api/test.php [L]
+
+# Serve index.html for all other requests (SPA support)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.html [L]

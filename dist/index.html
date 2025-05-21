@@ -31,8 +31,6 @@
             --success-color: #059669;
             --warning-color: #d97706;
             --error-color: #dc2626;
-            --summary-color: #fef3c7;
-            --summary-border: #eab308;
         }
 
         * {
@@ -126,10 +124,6 @@
             justify-content: center;
         }
         
-        .summary-btn {
-            color: var(--warning-color);
-        }
-        
         .header-btn:hover {
             background-color: var(--primary-light);
         }
@@ -214,7 +208,7 @@
 
         .customer-message {
             align-self: flex-end;
-            background-color: #ffaea1a1;
+            background-color: var(--background-color);
             margin-left: auto;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
@@ -239,51 +233,10 @@
             font-family: 'Font Awesome 6 Free';
             font-weight: 900;
         }
-        
-        .summary-message {
-            align-self: center;
-            background-color: var(--summary-color);
-            border-left: 3px solid var(--summary-border);
-            margin-left: auto;
-            margin-right: auto;
-            width: 90%;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            position: relative;
-        }
-        
-        .copy-btn {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background: none;
-            border: none;
-            font-size: 1rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            opacity: 0.6;
-            transition: all 0.2s ease;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-        }
-        
-        .copy-btn:hover {
-            opacity: 1;
-            background-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        .summary-message .sender::before {
-            content: '\f15c';
-            font-family: 'Font Awesome 6 Free';
-            font-weight: 900;
-        }
 
         .receiver-message {
             align-self: flex-start;
-            background-color: #cb9e3536;
+            background-color: var(--primary-light);
             margin-right: auto;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
@@ -704,7 +657,6 @@
             border: 1px solid var(--customer-border);
             color: var(--primary-dark);
             font-weight: 600;
-            font-size: 15px;
             text-transform: none;
         }
         
@@ -790,9 +742,6 @@
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span class="mode-indicator" id="modeIndicator"></span>
-                <button class="header-btn summary-btn" id="summaryBtn" title="Generate conversation summary">
-                    <i class="fas fa-clipboard-list"></i>
-                </button>
                 <button class="header-btn settings-btn" id="settingsBtn">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -925,10 +874,6 @@
                 <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
             </select>
         </div>
-        <div class="settings-group">
-            <h3>Summary Prompt</h3>
-            <textarea id="summaryPromptInput" rows="4" style="resize: vertical; font-size: 0.85rem; width: 100%;" placeholder="Customize the summary prompt here...">Please analyze the customer's messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.</textarea>
-        </div>
     </div>
 
     <script>
@@ -944,8 +889,6 @@
         const apiKeyInput = document.getElementById('apiKeyInput');
         const modelSelect = document.getElementById('modelSelect');
         const typingIndicator = document.getElementById('typingIndicator');
-        const summaryBtn = document.getElementById('summaryBtn');
-        const summaryPromptInput = document.getElementById('summaryPromptInput');
         
         // Detect if user is on mobile (customer) or desktop (receiver)
         function detectDeviceType() {
@@ -961,8 +904,7 @@
             model: 'claude-3-7-sonnet-20250219',
             messages: [],
             autoModeDetection: true, // Flag to enable/disable auto detection
-            customerName: 'Customer', // Default customer name
-            summaryPrompt: 'Please analyze the customer\'s messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.'
+            customerName: 'Customer' // Default customer name
         };
 
         // Initialize from localStorage if available
@@ -976,7 +918,6 @@
                 ? savedSettings.autoModeDetection 
                 : state.autoModeDetection;
             state.customerName = savedSettings.customerName || state.customerName;
-            state.summaryPrompt = savedSettings.summaryPrompt || state.summaryPrompt;
             
             // Update UI to reflect saved settings
             userModeSelect.value = state.userMode;
@@ -991,24 +932,12 @@
             if (document.getElementById('customerNameInput')) {
                 document.getElementById('customerNameInput').value = state.customerName;
             }
-            
-            if (summaryPromptInput) {
-                summaryPromptInput.value = state.summaryPrompt;
-            }
         } else if (state.autoModeDetection) {
             // If no saved settings but auto-detection is on, set mode based on screen size
             state.userMode = detectDeviceType();
             userModeSelect.value = state.userMode;
         }
         
-        // Make sure summary button and settings button is initially visible or hidden based on mode
-        if (summaryBtn) {
-            summaryBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
-        }
-        if (settingsBtn) {
-            settingsBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
-        }
-
         // Set interface based on current mode
         updateInterfaceMode();
 
@@ -1022,23 +951,9 @@
                 if (state.userMode === 'customer') {
                     modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
                     modeIndicator.className = 'mode-indicator customer-badge';
-                    // Hide summary button and settings button in customer mode
-                    if (summaryBtn) {
-                        summaryBtn.style.display = 'none';
-                    }
-                    if (settingsBtn) {
-                        settingsBtn.style.display = 'none';
-                    }
                 } else {
                     modeIndicator.innerHTML = `<i class="fas fa-headset"></i> Receiver Mode`;
                     modeIndicator.className = 'mode-indicator';
-                    // Show summary button and settings button in receiver mode
-                    if (summaryBtn) {
-                        summaryBtn.style.display = 'flex';
-                    }
-                    if (settingsBtn) {
-                        settingsBtn.style.display = 'flex';
-                    }
                 }
             }
         }
@@ -1177,20 +1092,6 @@
             saveSettings();
             showToast(`Model changed to ${e.target.options[e.target.selectedIndex].text}`, 'info');
         });
-        
-        // Add summary prompt input listener
-        if (summaryPromptInput) {
-            summaryPromptInput.addEventListener('change', (e) => {
-                state.summaryPrompt = e.target.value;
-                saveSettings();
-                showToast('Summary prompt updated', 'success');
-            });
-        }
-        
-        // Add summary button listener
-        if (summaryBtn) {
-            summaryBtn.addEventListener('click', generateConversationSummary);
-        }
 
         // Customer name input listener
         if (document.getElementById('customerNameInput')) {
@@ -1453,8 +1354,7 @@
                 baseLanguage: state.baseLanguage,
                 model: state.model,
                 autoModeDetection: state.autoModeDetection,
-                customerName: state.customerName,
-                summaryPrompt: state.summaryPrompt
+                customerName: state.customerName
             }));
         }
 
@@ -1619,9 +1519,6 @@
                     case 'system':
                         messageElement.classList.add('claude-message');
                         break;
-                    case 'summary':
-                        messageElement.classList.add('summary-message');
-                        break;
                 }
                 
                 // Add sender name
@@ -1635,31 +1532,6 @@
                 contentElement.classList.add('content');
                 contentElement.textContent = message.content;
                 messageElement.appendChild(contentElement);
-                
-                // Add copy button for summary messages
-                if (message.sender === 'summary') {
-                    const copyBtn = document.createElement('button');
-                    copyBtn.className = 'copy-btn';
-                    copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
-                    copyBtn.title = 'Copy summary to clipboard';
-                    copyBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(message.content)
-                            .then(() => {
-                                showToast('Summary copied to clipboard', 'success');
-                                // Change icon temporarily to show success
-                                copyBtn.innerHTML = '<i class="fas fa-check"></i>';
-                                setTimeout(() => {
-                                    copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
-                                }, 1500);
-                            })
-                            .catch(err => {
-                                console.error('Error copying text: ', err);
-                                showToast('Failed to copy to clipboard', 'error');
-                            });
-                    });
-                    messageElement.appendChild(copyBtn);
-                }
                 
                 // Add to chat container
                 chatContainer.appendChild(messageElement);
@@ -1679,8 +1551,6 @@
                     return `Receiver (${getLanguageName(state.baseLanguage)})`;
                 case 'system':
                     return 'System';
-                case 'summary':
-                    return 'Conversation Summary';
                 default:
                     return sender;
             }
@@ -1813,66 +1683,6 @@
             }, duration);
         }
 
-        // Function to generate conversation summary
-        async function generateConversationSummary() {
-            // Check if there are any customer messages
-            const customerMessages = state.messages.filter(msg => msg.sender === 'customer');
-            if (customerMessages.length === 0) {
-                showToast('No customer messages to summarize', 'warning');
-                return;
-            }
-            
-            // Check if API key is set
-            if (!state.apiKey) {
-                showToast('API key is required for summaries', 'error');
-                addSystemMessage("Please set your Claude API key in the settings to use the summary feature.");
-                return;
-            }
-            
-            // Show typing indicator
-            typingIndicator.classList.add('active');
-            
-            try {
-                // Build conversation history formatted string
-                const conversationHistory = customerMessages.map(msg => {
-                    const timestamp = new Date(msg.timestamp).toLocaleTimeString();
-                    return `[${timestamp}] ${state.customerName}: ${msg.content}`;
-                }).join('\n\n');
-                
-                // Create prompt for Claude with explicit instruction to use base language
-                const prompt = `${state.summaryPrompt}\n\nVery important: Your response MUST be in ${getLanguageName(state.baseLanguage)} language only.\n\nHere are the customer messages:\n\n${conversationHistory}`;
-                
-                // Call Claude API with the summary prompt
-                const response = await callClaudeAPI(prompt);
-                
-                // Hide typing indicator
-                typingIndicator.classList.remove('active');
-                
-                if (response) {
-                    // Add summary to the chat
-                    const summaryMessage = {
-                        id: Date.now().toString(),
-                        sender: 'summary',
-                        content: response,
-                        timestamp: new Date().toISOString()
-                    };
-                    
-                    state.messages.push(summaryMessage);
-                    renderMessages();
-                    
-                    // Save to localStorage
-                    localStorage.setItem('translationChatHistory', JSON.stringify(state.messages));
-                    
-                    // Show success notification
-                    showToast('Summary generated', 'success');
-                }
-            } catch (error) {
-                console.error('Error generating summary:', error);
-                typingIndicator.classList.remove('active');
-                addSystemMessage(`Error generating summary: ${error.message}`);
-            }
-        }
-        
         // Add device info to welcome message
         if (state.messages.length === 0) {
             const deviceType = detectDeviceType();
