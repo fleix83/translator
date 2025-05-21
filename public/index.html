@@ -43,11 +43,22 @@
         body {
             display: flex;
             flex-direction: column;
+            align-items: center;
             height: 100vh;
             padding: 1rem;
             background-color: var(--background-color);
             color: var(--text-primary);
             transition: all 0.3s ease;
+            overflow-x: hidden;
+        }
+        
+        .wrapper {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            position: relative;
         }
 
         .header {
@@ -60,6 +71,11 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             margin-bottom: 1rem;
             transition: all 0.3s ease;
+            position: sticky;
+            top: 0.5rem;
+            z-index: 50;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
 
         .header h1 {
@@ -191,9 +207,9 @@
         }
 
         .customer-message {
-            align-self: flex-start;
+            align-self: flex-end;
             background-color: var(--background-color);
-            margin-right: auto;
+            margin-left: auto;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
@@ -219,9 +235,9 @@
         }
 
         .receiver-message {
-            align-self: flex-end;
+            align-self: flex-start;
             background-color: var(--primary-light);
-            margin-left: auto;
+            margin-right: auto;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
@@ -368,7 +384,7 @@
         .settings-panel {
             display: none;
             position: absolute;
-            top: 4.5rem;
+            top: 5.5rem;
             right: 1rem;
             background-color: var(--card-color);
             padding: 1.25rem;
@@ -502,6 +518,12 @@
         }
 
         /* Responsive adjustments */
+        @media (max-width: 920px) {
+            .wrapper {
+                max-width: 100%;
+            }
+        }
+        
         @media (max-width: 768px) {
             body {
                 padding: 0.75rem;
@@ -713,72 +735,74 @@
     </style>
 </head>
 <body class="receiver-mode">
-    <div class="header">
-        <div>
-            <img src="/GGG_Wegweiser.svg" alt="GGG Wegweiser Logo" style="height: 2.5rem; width: auto; filter: invert(38%) sepia(82%) saturate(1539%) hue-rotate(217deg) brightness(97%) contrast(101%);">
+    <div class="wrapper">
+        <div class="header">
+            <div>
+                <img src="/GGG_Wegweiser.svg" alt="GGG Wegweiser Logo" style="height: 2.5rem; width: auto; filter: invert(38%) sepia(82%) saturate(1539%) hue-rotate(217deg) brightness(97%) contrast(101%);">
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span class="mode-indicator" id="modeIndicator"></span>
+                <button class="header-btn settings-btn" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="header-btn info-btn" id="infoBtn">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span class="mode-indicator" id="modeIndicator"></span>
-            <button class="header-btn settings-btn" id="settingsBtn">
-                <i class="fas fa-cog"></i>
-            </button>
-            <button class="header-btn info-btn" id="infoBtn">
-                <i class="fas fa-info-circle"></i>
-            </button>
-        </div>
-    </div>
 
-    <div class="info-panel panel" id="infoPanel" style="display: none; position: absolute; top: 4.5rem; right: 1rem; z-index: 100; width: 320px; max-height: 80vh; overflow-y: auto; border-top: 3px solid var(--secondary-color); animation: slideDown 0.3s ease;">
-        <h3 style="margin-bottom: 1rem; color: var(--secondary-color); font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-info-circle"></i> About Translator
-        </h3>
-        
-        <div style="margin-bottom: 1rem; background-color: var(--primary-light); border-radius: 8px; padding: 0.75rem; border-left: 3px solid var(--primary-color);">
+        <div class="info-panel panel" id="infoPanel" style="display: none; position: absolute; top: 5.5rem; right: 1rem; z-index: 100; width: 320px; max-height: 80vh; overflow-y: auto; border-top: 3px solid var(--secondary-color); animation: slideDown 0.3s ease;">
+            <h3 style="margin-bottom: 1rem; color: var(--secondary-color); font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-info-circle"></i> About Translator
+            </h3>
+            
+            <div style="margin-bottom: 1rem; background-color: var(--primary-light); border-radius: 8px; padding: 0.75rem; border-left: 3px solid var(--primary-color);">
+                <p style="margin-bottom: 0.75rem; font-size: 0.9rem; line-height: 1.5; color: var(--text-primary);">
+                    This application helps bridge language barriers by providing real-time translation between different languages.
+                </p>
+            </div>
+            
             <p style="margin-bottom: 0.75rem; font-size: 0.9rem; line-height: 1.5; color: var(--text-primary);">
-                This application helps bridge language barriers by providing real-time translation between different languages.
+                <i class="fas fa-server" style="color: var(--secondary-color); margin-right: 0.5rem;"></i>
+                <strong>Technical Details:</strong> Uses a Node.js backend proxy to communicate with the Claude API.
             </p>
-        </div>
-        
-        <p style="margin-bottom: 0.75rem; font-size: 0.9rem; line-height: 1.5; color: var(--text-primary);">
-            <i class="fas fa-server" style="color: var(--secondary-color); margin-right: 0.5rem;"></i>
-            <strong>Technical Details:</strong> Uses a Node.js backend proxy to communicate with the Claude API.
-        </p>
-        
-        <p style="margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">
-            <i class="fas fa-cogs" style="color: var(--secondary-color); margin-right: 0.5rem;"></i>
-            How it works:
-        </p>
-        
-        <ol style="margin-left: 1.75rem; margin-bottom: 1rem; font-size: 0.9rem; line-height: 1.6;">
-            <li>The frontend sends requests to our local server</li>
-            <li>The server forwards these requests to the Claude API</li>
-            <li>Claude's responses are returned to the frontend</li>
-        </ol>
-        
-        <div style="padding: 0.75rem; background-color: rgba(255, 247, 230, 0.5); border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--warning-color);">
-            <p style="font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center;">
-                <i class="fas fa-key" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
-                To use this application, you'll need to enter your Claude API key in the settings panel.
+            
+            <p style="margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">
+                <i class="fas fa-cogs" style="color: var(--secondary-color); margin-right: 0.5rem;"></i>
+                How it works:
             </p>
+            
+            <ol style="margin-left: 1.75rem; margin-bottom: 1rem; font-size: 0.9rem; line-height: 1.6;">
+                <li>The frontend sends requests to our local server</li>
+                <li>The server forwards these requests to the Claude API</li>
+                <li>Claude's responses are returned to the frontend</li>
+            </ol>
+            
+            <div style="padding: 0.75rem; background-color: rgba(255, 247, 230, 0.5); border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--warning-color);">
+                <p style="font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center;">
+                    <i class="fas fa-key" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
+                    To use this application, you'll need to enter your Claude API key in the settings panel.
+                </p>
+            </div>
+            
+            <button id="closeInfoBtn" class="btn btn-primary" style="width: 100%;">Close <i class="fas fa-times"></i></button>
         </div>
-        
-        <button id="closeInfoBtn" class="btn btn-primary" style="width: 100%;">Close <i class="fas fa-times"></i></button>
-    </div>
 
-    <div class="chat-container" id="chatContainer">
-        <!-- Messages will be added here -->
-    </div>
+        <div class="chat-container" id="chatContainer">
+            <!-- Messages will be added here -->
+        </div>
 
-    <div class="typing-indicator" id="typingIndicator">
-        Someone is typing...
-    </div>
+        <div class="typing-indicator" id="typingIndicator">
+            Someone is typing...
+        </div>
 
-    <div class="input-container">
-        <textarea class="input-field" id="messageInput" placeholder="Type a message..." rows="2"></textarea>
-        <button class="voice-btn" id="voiceBtn">
-            <i class="fas fa-microphone"></i>
-        </button>
-        <button class="send-btn" id="sendBtn">Send</button>
+        <div class="input-container">
+            <textarea class="input-field" id="messageInput" placeholder="Type a message..." rows="2"></textarea>
+            <button class="voice-btn" id="voiceBtn">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button class="send-btn" id="sendBtn">Send</button>
+        </div>
     </div>
 
     <div class="settings-panel" id="settingsPanel">
@@ -1094,6 +1118,19 @@
         
         // Voice input functionality
         function startVoiceInput() {
+            // Check if running on Android
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            
+            // Show helper toast for Android devices the first time
+            if (isAndroid) {
+                // Use localStorage to check if this is first time (per session)
+                const hasMicHint = sessionStorage.getItem('microphoneHintShown');
+                if (!hasMicHint) {
+                    showToast("Please allow microphone access when prompted", "info", 4000);
+                    sessionStorage.setItem('microphoneHintShown', 'true');
+                }
+            }
+            
             // Check if speech recognition is supported
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                 addSystemMessage("Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.");
@@ -1233,6 +1270,9 @@
                 recognition.onerror = function(event) {
                     console.error('Speech recognition error', event.error);
                     
+                    // Check if running on Android
+                    const isAndroid = /Android/i.test(navigator.userAgent);
+                    
                     // Handle different error types
                     switch(event.error) {
                         case 'no-speech':
@@ -1249,7 +1289,13 @@
                             showToast("Network error occurred. Please check your connection.", "error");
                             break;
                         case 'not-allowed':
-                            showToast("Microphone access denied. Please allow microphone access in your browser.", "error");
+                            if (isAndroid) {
+                                // More specific guidance for Android users
+                                showToast("Please allow microphone access in your Chrome settings", "error", 5000);
+                                addSystemMessage("To enable microphone on Android:\n1. Tap the address bar\n2. Tap the info/lock icon\n3. Tap Site Settings\n4. Set Microphone to Allow");
+                            } else {
+                                showToast("Microphone access denied. Please allow microphone access in your browser.", "error");
+                            }
                             break;
                         default:
                             showToast(`Voice input error: ${event.error}`, "error");
