@@ -12,7 +12,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({limit: '10mb'})); // Increase JSON size limit
 
 // Log all incoming requests to help with debugging
 app.use((req, res, next) => {
@@ -38,7 +38,8 @@ app.post('/api/claude', async (req, res) => {
     console.log('Request body received:', { 
       model, 
       promptLength: prompt?.length || 0,
-      hasApiKey: !!apiKey 
+      hasApiKey: !!apiKey,
+      apiKeyFirstChars: apiKey ? `${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 4)}` : 'none' 
     });
     
     if (!apiKey) {
@@ -47,6 +48,9 @@ app.post('/api/claude', async (req, res) => {
     }
 
     console.log('Making request to Claude API...');
+    console.log('Authorization header:', `Bearer ${apiKey.substring(0, 5)}...`);
+    console.log('API version header:', '2023-06-01');
+    
     const response = await axios.post('https://api.anthropic.com/v1/messages', {
       model: model || 'claude-3-7-sonnet-20250219',
       max_tokens: 1000,
@@ -56,9 +60,13 @@ app.post('/api/claude', async (req, res) => {
     }, {
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      }
+        'Authorization': `Bearer ${apiKey}`,  // Using Bearer token format
+        'anthropic-version': '2023-06-01',
+        // Try a newer API version as fallback if the client isn't already using one
+        'x-anthropic-version': '2023-06-01',
+        'x-api-key': apiKey  // Adding this header as an alternative authentication method
+      },
+      timeout: 30000 // 30 second timeout
     });
 
     console.log('Received response from Claude API:', {
@@ -69,12 +77,26 @@ app.post('/api/claude', async (req, res) => {
     res.json(response.data);
   } catch (error) {
     console.error('Error proxying to Claude API:', error.response?.data || error.message);
-    console.error('Full error:', error);
+    
+    // Log more details about the error
+    if (error.response) {
+      console.log('Error response status:', error.response.status);
+      console.log('Error response headers:', error.response.headers);
+      console.log('Error details:', JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.log('Error details:', error.message);
+    }
     
     // Forward Claude API error response if available
     if (error.response?.data) {
       console.log('Forwarding Claude API error response');
       return res.status(error.response.status).json(error.response.data);
+    }
+    
+    // Handle timeout errors specifically
+    if (error.code === 'ECONNABORTED') {
+      console.log('Request timed out');
+      return res.status(504).json({ error: 'Request to Claude API timed out' });
     }
     
     console.log('Sending generic error response');

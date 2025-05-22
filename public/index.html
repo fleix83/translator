@@ -9,6 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <meta name="theme-color" content="#5468ff">
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
     <style>
         :root {
             /* Main theme colors */
@@ -780,6 +782,13 @@
         .btn-primary:active {
             transform: translateY(1px);
         }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #94a3b8;
+            transform: none;
+        }
     </style>
 </head>
 <body class="receiver-mode">
@@ -790,6 +799,9 @@
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span class="mode-indicator" id="modeIndicator"></span>
+                <button class="header-btn share-btn" id="shareBtn" title="Share conversation link">
+                    <i class="fas fa-share-alt"></i>
+                </button>
                 <button class="header-btn summary-btn" id="summaryBtn" title="Generate conversation summary">
                     <i class="fas fa-clipboard-list"></i>
                 </button>
@@ -856,6 +868,35 @@
         </div>
     </div>
 
+    <!-- Share URL Modal -->
+    <div class="panel" id="shareModal" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 200; width: 90%; max-width: 400px; text-align: center;">
+        <h3 style="margin-bottom: 1rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <i class="fas fa-share-alt" style="color: var(--primary-color);"></i> Share Conversation
+        </h3>
+        
+        <!-- QR Code Section -->
+        <div style="margin-bottom: 1.5rem;">
+            <p style="margin-bottom: 1rem; font-size: 0.9rem;">Scan this QR code:</p>
+            <div id="qrcode" style="margin: 0 auto; width: 200px; height: 200px; background-color: white; padding: 10px; border-radius: 8px;"></div>
+            <button id="downloadQrBtn" class="btn" style="background-color: var(--success-color); color: white; border-radius: 8px; padding: 0.5rem 1rem; margin-top: 0.75rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.5rem;" disabled>
+                <i class="fas fa-download"></i> Download QR Code
+            </button>
+        </div>
+        
+        <!-- URL Section -->
+        <p style="margin-bottom: 0.75rem; font-size: 0.9rem;">Or copy this link:</p>
+        <div style="display: flex; margin-bottom: 1.5rem;">
+            <input type="text" id="shareUrlInput" readonly style="flex: 1; padding: 0.75rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px 0 0 8px; font-size: 0.9rem;">
+            <button id="copyShareUrlBtn" class="btn" style="background-color: var(--primary-color); color: white; border-radius: 0 8px 8px 0; padding: 0 1rem;">
+                <i class="fas fa-copy"></i>
+            </button>
+        </div>
+        <button id="closeShareModalBtn" class="btn btn-primary" style="width: 100%;">Close</button>
+    </div>
+
+    <!-- Modal Backdrop -->
+    <div id="modalBackdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 150;"></div>
+
     <div class="settings-panel" id="settingsPanel">
         <div class="settings-group">
             <h3>User Mode</h3>
@@ -902,10 +943,10 @@
         <div class="settings-group">
             <h3>Base Language</h3>
             <select id="baseLanguageSelect">
-                <option value="en" selected>English</option>
+                <option value="de" selected>German</option>
+                <option value="en">English</option>
                 <option value="fr">French</option>
                 <option value="es">Spanish</option>
-                <option value="de">German</option>
                 <option value="sr">Serbian</option>
                 <option value="sq">Albanian</option>
                 <option value="uk">Ukrainian</option>
@@ -952,30 +993,121 @@
             return window.innerWidth < 768 ? 'customer' : 'receiver';
         }
 
+        // Token management functions
+        function generateSessionToken() {
+            // Use crypto API to generate a secure random token (UUID-like)
+            const array = new Uint8Array(16);
+            window.crypto.getRandomValues(array);
+            
+            // Format as UUID-like string
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+        
+        function getSessionToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let token = urlParams.get('session');
+            
+            // If no token in URL, generate one and update URL
+            if (!token) {
+                token = generateSessionToken();
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('session', token);
+                window.history.pushState({}, '', newUrl);
+            }
+            
+            return token;
+        }
+        
+        // Get or create session token
+        const sessionToken = getSessionToken();
+        console.log("Active session:", sessionToken.substring(0, 8) + '...');
+        
+        // Get URL parameters for settings
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Save API key from URL to localStorage if it exists
+        if (urlParams.get('apiKey')) {
+            localStorage.setItem('claudeApiKey', urlParams.get('apiKey'));
+        }
+        
         // App state
         const state = {
             userMode: detectDeviceType(), // Auto-detect initial mode
-            customerLanguage: 'fr',
-            baseLanguage: 'en',
-            apiKey: localStorage.getItem('claudeApiKey') || '',
+            customerLanguage: urlParams.get('customerLang') || 'fr',
+            baseLanguage: urlParams.get('baseLang') || 'de',
+            apiKey: urlParams.get('apiKey') || localStorage.getItem('claudeApiKey') || '',
             model: 'claude-3-7-sonnet-20250219',
             messages: [],
             autoModeDetection: true, // Flag to enable/disable auto detection
-            customerName: 'Customer', // Default customer name
-            summaryPrompt: 'Please analyze the customer\'s messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.'
+            customerName: urlParams.get('customerName') || 'Customer', // Get from URL or use default
+            summaryPrompt: 'Please analyze the customer\'s messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.',
+            sessionToken: sessionToken,
+            sessionUpdated: Date.now() // Timestamp for expiry tracking
         };
 
-        // Initialize from localStorage if available
-        if (localStorage.getItem('translationChatSettings')) {
-            const savedSettings = JSON.parse(localStorage.getItem('translationChatSettings'));
+        // Function to create prefixed localStorage keys
+        function getStorageKey(key) {
+            return `session_${state.sessionToken}_${key}`;
+        }
+        
+        // Check for session expiry (31 days = 2678400000 ms)
+        function checkSessionExpiry() {
+            // Go through all localStorage items to find sessions
+            const SESSION_EXPIRY = 31 * 24 * 60 * 60 * 1000; // 31 days in milliseconds
+            const now = Date.now();
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                // Look for session data
+                if (key.startsWith('session_') && key.includes('_timestamp')) {
+                    const sessionId = key.split('_')[1];
+                    const timestamp = parseInt(localStorage.getItem(key));
+                    
+                    // Check if session is expired
+                    if (now - timestamp > SESSION_EXPIRY) {
+                        console.log(`Removing expired session: ${sessionId}`);
+                        // Remove all data for this session
+                        for (let j = localStorage.length - 1; j >= 0; j--) {
+                            const itemKey = localStorage.key(j);
+                            if (itemKey.includes(`session_${sessionId}_`)) {
+                                localStorage.removeItem(itemKey);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Run expiry check
+        checkSessionExpiry();
+        
+        // Update timestamp for current session
+        localStorage.setItem(getStorageKey('timestamp'), Date.now().toString());
+        
+        // Initialize from localStorage if available for this session
+        const settingsKey = getStorageKey('settings');
+        // Prioritize URL parameters over saved settings
+        if (localStorage.getItem(settingsKey)) {
+            const savedSettings = JSON.parse(localStorage.getItem(settingsKey));
+            
+            // Only use saved settings for values not provided in URL
+            if (!urlParams.get('customerLang')) {
+                state.customerLanguage = savedSettings.customerLanguage || state.customerLanguage;
+            }
+            
+            if (!urlParams.get('baseLang')) {
+                state.baseLanguage = savedSettings.baseLanguage || state.baseLanguage;
+            }
+            
+            if (!urlParams.get('customerName')) {
+                state.customerName = savedSettings.customerName || state.customerName;
+            }
+            
             state.userMode = savedSettings.userMode || state.userMode;
-            state.customerLanguage = savedSettings.customerLanguage || state.customerLanguage;
-            state.baseLanguage = savedSettings.baseLanguage || state.baseLanguage;
             state.model = savedSettings.model || state.model;
             state.autoModeDetection = savedSettings.autoModeDetection !== undefined 
                 ? savedSettings.autoModeDetection 
                 : state.autoModeDetection;
-            state.customerName = savedSettings.customerName || state.customerName;
             state.summaryPrompt = savedSettings.summaryPrompt || state.summaryPrompt;
             
             // Update UI to reflect saved settings
@@ -1001,12 +1133,18 @@
             userModeSelect.value = state.userMode;
         }
         
-        // Make sure summary button and settings button is initially visible or hidden based on mode
+        // Make sure buttons are initially visible or hidden based on mode
         if (summaryBtn) {
             summaryBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
         }
         if (settingsBtn) {
             settingsBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
+        }
+        
+        // Share button should only be visible in receiver mode
+        const shareBtn = document.getElementById('shareBtn');
+        if (shareBtn) {
+            shareBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
         }
 
         // Set interface based on current mode
@@ -1022,22 +1160,28 @@
                 if (state.userMode === 'customer') {
                     modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
                     modeIndicator.className = 'mode-indicator customer-badge';
-                    // Hide summary button and settings button in customer mode
-                    if (summaryBtn) {
+                    // Hide buttons in customer mode
+                    if (typeof summaryBtn !== 'undefined' && summaryBtn) {
                         summaryBtn.style.display = 'none';
                     }
                     if (settingsBtn) {
                         settingsBtn.style.display = 'none';
                     }
+                    if (shareBtn) {
+                        shareBtn.style.display = 'none';
+                    }
                 } else {
                     modeIndicator.innerHTML = `<i class="fas fa-headset"></i> Receiver Mode`;
                     modeIndicator.className = 'mode-indicator';
-                    // Show summary button and settings button in receiver mode
-                    if (summaryBtn) {
+                    // Show buttons in receiver mode
+                    if (typeof summaryBtn !== 'undefined' && summaryBtn) {
                         summaryBtn.style.display = 'flex';
                     }
                     if (settingsBtn) {
                         settingsBtn.style.display = 'flex';
+                    }
+                    if (shareBtn) {
+                        shareBtn.style.display = 'flex';
                     }
                 }
             }
@@ -1048,9 +1192,10 @@
             apiKeyInput.value = state.apiKey;
         }
 
-        // Load chat history from localStorage if available
-        if (localStorage.getItem('translationChatHistory')) {
-            state.messages = JSON.parse(localStorage.getItem('translationChatHistory'));
+        // Load chat history from localStorage if available for this session
+        const chatHistoryKey = getStorageKey('chatHistory');
+        if (localStorage.getItem(chatHistoryKey)) {
+            state.messages = JSON.parse(localStorage.getItem(chatHistoryKey));
             renderMessages();
         }
         
@@ -1096,18 +1241,176 @@
         document.getElementById('closeInfoBtn').addEventListener('click', () => {
             document.getElementById('infoPanel').style.display = 'none';
         });
+        
+        // Share button and modal functionality
+        const shareModal = document.getElementById('shareModal');
+        const modalBackdrop = document.getElementById('modalBackdrop');
+        const shareUrlInput = document.getElementById('shareUrlInput');
+        
+        // Open share modal
+        shareBtn.addEventListener('click', () => {
+            // Get the base URL with the session token
+            const url = new URL(window.location.href);
+            
+            // Add essential settings as parameters to the URL
+            // Add API key (if exists)
+            if (state.apiKey) {
+                url.searchParams.set('apiKey', state.apiKey);
+            }
+            
+            // Add customer name
+            url.searchParams.set('customerName', state.customerName);
+            
+            // Add customer language
+            url.searchParams.set('customerLang', state.customerLanguage);
+            
+            // Add base language
+            url.searchParams.set('baseLang', state.baseLanguage);
+            
+            // Generate the complete share URL
+            const shareUrl = url.toString();
+            shareUrlInput.value = shareUrl;
+            
+            // Show modal and backdrop
+            shareModal.style.display = 'block';
+            modalBackdrop.style.display = 'block';
+            
+            // Generate QR code
+            const qrcodeContainer = document.getElementById('qrcode');
+            // Clear any existing QR code
+            qrcodeContainer.innerHTML = '';
+            
+            try {
+                // Generate new QR code using image
+                QRCode.toDataURL(shareUrl, {
+                    width: 180,
+                    margin: 1,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, (error, url) => {
+                    if (error) {
+                        console.error('Error generating QR code:', error);
+                        // Show error in QR code container
+                        qrcodeContainer.innerHTML = `<p style="color: var(--error-color); padding: 20px;">Could not generate QR code</p>`;
+                    } else {
+                        // Create an image element with the QR code
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.alt = 'QR Code for sharing conversation';
+                        img.style.width = '100%';
+                        img.style.height = 'auto';
+                        img.style.maxWidth = '180px';
+                        img.style.display = 'block';
+                        img.style.margin = '0 auto';
+                        
+                        // Add the image to the container
+                        qrcodeContainer.appendChild(img);
+                        
+                        // Enable download button
+                        const downloadQrBtn = document.getElementById('downloadQrBtn');
+                        downloadQrBtn.disabled = false;
+                        
+                        // Store the dataURL for downloading
+                        downloadQrBtn.setAttribute('data-qr-url', url);
+                    }
+                });
+            } catch (e) {
+                console.error('QR code generation failed:', e);
+                qrcodeContainer.innerHTML = `<p style="color: var(--error-color); padding: 20px;">Could not generate QR code</p>`;
+                
+                // Disable download button
+                const downloadQrBtn = document.getElementById('downloadQrBtn');
+                downloadQrBtn.disabled = true;
+            }
+        });
+        
+        // Copy URL button functionality
+        document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+            // Use modern clipboard API if available, fallback to older method
+            const copyBtn = document.getElementById('copyShareUrlBtn');
+            const originalIcon = copyBtn.innerHTML;
+            
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(shareUrlInput.value)
+                    .then(() => {
+                        showToast('URL copied to clipboard', 'success');
+                        // Visual feedback
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = originalIcon;
+                        }, 1500);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                        // Fallback to old method
+                        shareUrlInput.select();
+                        document.execCommand('copy');
+                        showToast('URL copied to clipboard', 'success');
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = originalIcon;
+                        }, 1500);
+                    });
+            } else {
+                // Fallback for older browsers
+                shareUrlInput.select();
+                document.execCommand('copy');
+                showToast('URL copied to clipboard', 'success');
+                copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalIcon;
+                }, 1500);
+            }
+        });
+        
+        // Close share modal
+        document.getElementById('closeShareModalBtn').addEventListener('click', () => {
+            shareModal.style.display = 'none';
+            modalBackdrop.style.display = 'none';
+        });
+        
+        // Close modal when clicking on backdrop
+        modalBackdrop.addEventListener('click', () => {
+            shareModal.style.display = 'none';
+            modalBackdrop.style.display = 'none';
+        });
+        
+        // QR Code download button functionality
+        document.getElementById('downloadQrBtn').addEventListener('click', () => {
+            const downloadQrBtn = document.getElementById('downloadQrBtn');
+            const qrUrl = downloadQrBtn.getAttribute('data-qr-url');
+            
+            if (qrUrl) {
+                // Create a temporary link element
+                const downloadLink = document.createElement('a');
+                downloadLink.href = qrUrl;
+                downloadLink.download = 'translator-qr-code.png';
+                
+                // Trigger download
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                // Show toast
+                showToast('QR Code downloaded', 'success');
+            } else {
+                showToast('QR Code not available', 'error');
+            }
+        });
 
         // Click outside panels to close them
         document.addEventListener('click', (e) => {
             // Close settings panel if clicked outside
-            if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+            if (!settingsPanel.contains(e.target) && e.target !== settingsBtn && !e.target.closest('.fa-cog')) {
                 settingsPanel.classList.remove('active');
             }
             
             // Close info panel if clicked outside
             const infoPanel = document.getElementById('infoPanel');
             const infoBtn = document.getElementById('infoBtn');
-            if (infoPanel.style.display === 'block' && !infoPanel.contains(e.target) && e.target !== infoBtn) {
+            if (infoPanel.style.display === 'block' && !infoPanel.contains(e.target) && e.target !== infoBtn && !e.target.closest('.fa-info-circle')) {
                 infoPanel.style.display = 'none';
             }
         });
@@ -1447,7 +1750,8 @@
 
         // Functions
         function saveSettings() {
-            localStorage.setItem('translationChatSettings', JSON.stringify({
+            const settingsKey = getStorageKey('settings');
+            localStorage.setItem(settingsKey, JSON.stringify({
                 userMode: state.userMode,
                 customerLanguage: state.customerLanguage,
                 baseLanguage: state.baseLanguage,
@@ -1456,6 +1760,9 @@
                 customerName: state.customerName,
                 summaryPrompt: state.summaryPrompt
             }));
+            
+            // Update session timestamp
+            localStorage.setItem(getStorageKey('timestamp'), Date.now().toString());
         }
 
         function sendMessage() {
@@ -1482,8 +1789,8 @@
             state.messages.push(message);
             renderMessages();
             
-            // Save to localStorage
-            localStorage.setItem('translationChatHistory', JSON.stringify(state.messages));
+            // Save to localStorage with session token
+            localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
 
             // If API key is set, process through Claude
             if (state.apiKey) {
@@ -1528,8 +1835,8 @@
                     state.messages.push(claudeMessage);
                     renderMessages();
                     
-                    // Save to localStorage
-                    localStorage.setItem('translationChatHistory', JSON.stringify(state.messages));
+                    // Save to localStorage with session token
+                    localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
                 }
             } catch (error) {
                 console.error('Error processing through Claude:', error);
@@ -1562,14 +1869,25 @@
                 console.log("Response status:", response.status);
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error("API error response:", errorData);
-                    throw new Error(`API error: ${errorData.error || response.statusText}`);
+                    try {
+                        const errorData = await response.json();
+                        console.error("API error response:", errorData);
+                        throw new Error(`API error: ${errorData.error || response.statusText}`);
+                    } catch (jsonError) {
+                        throw new Error(`API error (${response.status}): ${response.statusText}`);
+                    }
                 }
 
                 const data = await response.json();
-                console.log("Claude API response received");
-                return data.content[0].text;
+                console.log("Claude API response received:", data);
+                
+                // Check if the response has the expected structure
+                if (data && data.content && data.content[0] && data.content[0].text) {
+                    return data.content[0].text;
+                } else {
+                    console.error("Unexpected API response structure:", data);
+                    throw new Error("Unexpected API response format");
+                }
             } catch (error) {
                 console.error('Claude API call failed:', error);
                 // Fall back to simulation if the server request fails
@@ -1717,8 +2035,8 @@
             state.messages.push(systemMessage);
             renderMessages();
             
-            // Save to localStorage
-            localStorage.setItem('translationChatHistory', JSON.stringify(state.messages));
+            // Save to localStorage with session token
+            localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
             
             // Add toast notification for important system messages
             showToast(text, 'info');
@@ -1860,8 +2178,8 @@
                     state.messages.push(summaryMessage);
                     renderMessages();
                     
-                    // Save to localStorage
-                    localStorage.setItem('translationChatHistory', JSON.stringify(state.messages));
+                    // Save to localStorage with session token
+                    localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
                     
                     // Show success notification
                     showToast('Summary generated', 'success');
