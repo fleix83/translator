@@ -106,6 +106,7 @@ app.post('/api/claude', async (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Proxy server running on port ${PORT}`);
+  const isDev = process.env.NODE_ENV === 'development';
+  console.log(`Proxy server running on port ${PORT}${isDev ? ' (development mode with hot-reload)' : ''}`);
   console.log(`Access the translation chat at http://localhost:${PORT}`);
 });
