@@ -2,8 +2,12 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
 // Enable CORS for browser requests with specific configuration
 app.use(cors({
@@ -17,6 +21,21 @@ app.use(express.json({limit: '10mb'})); // Increase JSON size limit
 // Log all incoming requests to help with debugging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
+// Optional redirect to HTTPS for microphone permissions
+app.use((req, res, next) => {
+  // Check if we should suggest HTTPS (only on GET requests to the main page)
+  if (req.method === 'GET' && (req.path === '/' || req.path === '') && req.query.secure !== 'false') {
+    // Add a banner to suggest HTTPS, but don't force redirect
+    // This will be handled client-side for better UX
+    const originalSendFile = res.sendFile;
+    res.sendFile = function() {
+      res.set('X-Should-Use-Https', 'true');
+      return originalSendFile.apply(res, arguments);
+    };
+  }
   next();
 });
 
@@ -104,9 +123,27 @@ app.post('/api/claude', async (req, res) => {
   }
 });
 
-// Start the server
+// Start HTTP server
 app.listen(PORT, () => {
   const isDev = process.env.NODE_ENV === 'development';
-  console.log(`Proxy server running on port ${PORT}${isDev ? ' (development mode with hot-reload)' : ''}`);
+  console.log(`HTTP server running on port ${PORT}${isDev ? ' (development mode with hot-reload)' : ''}`);
   console.log(`Access the translation chat at http://localhost:${PORT}`);
 });
+
+// Start HTTPS server (for microphone permissions)
+try {
+  // Read SSL certificate files
+  const privateKey = fs.readFileSync(path.join(__dirname, 'ssl', 'key.pem'), 'utf8');
+  const certificate = fs.readFileSync(path.join(__dirname, 'ssl', 'cert.pem'), 'utf8');
+  const credentials = { key: privateKey, cert: certificate };
+
+  // Create HTTPS server
+  const httpsServer = https.createServer(credentials, app);
+  httpsServer.listen(HTTPS_PORT, () => {
+    console.log(`HTTPS server running on port ${HTTPS_PORT} (with SSL for microphone access)`);
+    console.log(`Access the secure translation chat at https://localhost:${HTTPS_PORT}`);
+  });
+} catch (error) {
+  console.error('Failed to start HTTPS server:', error.message);
+  console.log('Continue using HTTP server without microphone access, or run mkcert -install');
+}

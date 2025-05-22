@@ -37,12 +37,35 @@ A real-time translation chat interface powered by Claude AI.
    ```
    npm start
    ```
-4. Open http://localhost:3000 in your browser
+4. Open in your browser:
+   - Regular version: http://localhost:3000
+   - Secure version (for microphone access): https://localhost:3443
 
 The development server uses nodemon for hot reloading, watching for changes in:
 - server.js
 - public/ directory
 - Any .js, .html, or .css files
+
+### HTTPS Setup for Microphone Access
+
+For voice input functionality, browsers require HTTPS. We use mkcert to create local SSL certificates:
+
+1. Install mkcert if you haven't already:
+   ```
+   brew install mkcert
+   ```
+
+2. SSL certificates are stored in the `ssl/` directory. If you need to recreate them:
+   ```
+   mkdir -p ssl
+   mkcert -key-file ./ssl/key.pem -cert-file ./ssl/cert.pem localhost 127.0.0.1
+   ```
+
+3. For full trust (no browser warnings), install the certificates as a trusted CA:
+   ```
+   mkcert -install
+   ```
+   (Note: This may require admin/sudo privileges)
 
 ## LAMP Server Deployment
 

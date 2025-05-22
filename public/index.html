@@ -1520,6 +1520,30 @@
         
         // Voice input functionality
         function startVoiceInput() {
+            // Check if we're on HTTPS (required for microphone access)
+            if (window.location.protocol !== 'https:') {
+                // Get the HTTPS URL
+                const httpsUrl = window.location.href.replace('http://', 'https://').replace(':3000', ':3443');
+                
+                // Show message about HTTPS requirement
+                addSystemMessage(`Voice input requires a secure connection (HTTPS). Please use the secure version at: ${httpsUrl}`);
+                showToast("Voice input requires HTTPS", "warning", 4000);
+                
+                // Add the HTTPS banner if not already present
+                if (!document.querySelector('meta[name="should-use-https"]')) {
+                    const header = document.querySelector('head');
+                    const meta = document.createElement('meta');
+                    meta.name = 'should-use-https';
+                    meta.content = 'true';
+                    header.appendChild(meta);
+                    
+                    // Show the banner
+                    checkForHttpsRecommendation();
+                }
+                
+                return;
+            }
+            
             // Check if running on Android
             const isAndroid = /Android/i.test(navigator.userAgent);
             
@@ -2214,8 +2238,62 @@
                 });
         }
         
+        // Check if we should be using HTTPS for microphone access
+        function checkForHttpsRecommendation() {
+            // Only show the recommendation if we're on HTTP and the server suggests HTTPS
+            if (window.location.protocol !== 'https:' && document.querySelector('meta[name="should-use-https"]')) {
+                const httpsUrl = window.location.href.replace('http://', 'https://').replace(':3000', ':3443');
+                
+                // Create the HTTPS suggestion banner
+                const httpsBanner = document.createElement('div');
+                httpsBanner.style.position = 'fixed';
+                httpsBanner.style.top = '0';
+                httpsBanner.style.left = '0';
+                httpsBanner.style.right = '0';
+                httpsBanner.style.backgroundColor = 'var(--warning-color)';
+                httpsBanner.style.color = 'white';
+                httpsBanner.style.padding = '10px 20px';
+                httpsBanner.style.textAlign = 'center';
+                httpsBanner.style.zIndex = '1000';
+                httpsBanner.style.display = 'flex';
+                httpsBanner.style.justifyContent = 'space-between';
+                httpsBanner.style.alignItems = 'center';
+                
+                httpsBanner.innerHTML = `
+                    <div>
+                        <i class="fas fa-microphone-slash"></i> 
+                        Voice input requires HTTPS. <a href="${httpsUrl}" style="color: white; text-decoration: underline; font-weight: bold;">Switch to secure version</a>
+                    </div>
+                    <button style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                document.body.insertBefore(httpsBanner, document.body.firstChild);
+                
+                // Add click handler to close button
+                httpsBanner.querySelector('button').addEventListener('click', () => {
+                    httpsBanner.remove();
+                    // Add parameter to prevent showing the banner again
+                    const newUrl = new URL(window.location);
+                    newUrl.searchParams.set('secure', 'false');
+                    window.history.replaceState({}, '', newUrl);
+                });
+            }
+        }
+        
         // Loading animation for the page
         document.addEventListener('DOMContentLoaded', () => {
+            // Check for HTTPS recommendation header
+            const shouldUseHttps = document.querySelector('meta[name="x-should-use-https"]');
+            if (!shouldUseHttps && window.location.protocol !== 'https:') {
+                const header = document.querySelector('head');
+                const meta = document.createElement('meta');
+                meta.name = 'should-use-https';
+                meta.content = 'true';
+                header.appendChild(meta);
+            }
+            
             // Add loading overlay
             const loadingOverlay = document.createElement('div');
             loadingOverlay.className = 'loading-overlay';
@@ -2267,6 +2345,9 @@
                 loadingOverlay.style.opacity = '0';
                 setTimeout(() => {
                     loadingOverlay.remove();
+                    
+                    // Check if we should recommend HTTPS after loading
+                    checkForHttpsRecommendation();
                 }, 500);
             }, 1000);
         });
