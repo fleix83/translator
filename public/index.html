@@ -14,7 +14,7 @@
     <style>
         :root {
             /* Main theme colors */
-            --primary-color: #5468ff;
+            --primary-color: #55b0ff;
             --primary-light: #e9ebff;
             --primary-dark: #3a4db4;
             --secondary-color: #38b2ac;
@@ -50,7 +50,7 @@
             align-items: center;
             height: 100vh;
             padding: 1rem;
-            background-color: var(--background-color);
+            background-color: #b69a6ea6;
             color: var(--text-primary);
             transition: all 0.3s ease;
             overflow-x: hidden;
@@ -69,7 +69,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.25rem;
+            padding: 1.7rem 1.25rem;
             background-color: var(--card-color);
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -129,7 +129,7 @@
         }
         
         .summary-btn {
-            color: var(--warning-color);
+            color: var(--primary-color);
         }
         
         .header-btn:hover {
@@ -795,7 +795,7 @@
     <div class="wrapper">
         <div class="header">
             <div>
-                <img src="/GGG_Wegweiser.svg" alt="GGG Wegweiser Logo" style="height: 2.5rem; width: auto; filter: invert(38%) sepia(82%) saturate(1539%) hue-rotate(217deg) brightness(97%) contrast(101%);">
+                <img src="GGG_Wegweiser.png" alt="GGG Wegweiser Logo" id="logoImage" style="height: 4.5rem; width: auto; margin: 0px 30px;">
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span class="mode-indicator" id="modeIndicator"></span>
@@ -960,10 +960,11 @@
         <div class="settings-group">
             <h3>Claude API Model</h3>
             <select id="modelSelect">
-                <option value="claude-3-7-sonnet-20250219" selected>Claude 3.7 Sonnet</option>
+                <option value="claude-3-haiku-20240307" selected>Claude 3 Haiku</option>
                 <option value="claude-3-opus-20240229">Claude 3 Opus</option>
                 <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
-                <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
+                <option value="claude-4">Claude 4.0</option>
             </select>
         </div>
         <div class="settings-group">
@@ -1036,7 +1037,7 @@
             customerLanguage: urlParams.get('customerLang') || 'fr',
             baseLanguage: urlParams.get('baseLang') || 'de',
             apiKey: urlParams.get('apiKey') || localStorage.getItem('claudeApiKey') || '',
-            model: 'claude-3-7-sonnet-20250219',
+            model: 'claude-3-haiku-20240307', // Use Claude 3 Haiku which is known to work with the API key
             messages: [],
             autoModeDetection: true, // Flag to enable/disable auto detection
             customerName: urlParams.get('customerName') || 'Customer', // Get from URL or use default
@@ -1146,6 +1147,12 @@
         if (shareBtn) {
             shareBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
         }
+        
+        // Info button should only be visible in receiver mode
+        const infoBtn = document.getElementById('infoBtn');
+        if (infoBtn) {
+            infoBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
+        }
 
         // Set interface based on current mode
         updateInterfaceMode();
@@ -1156,6 +1163,8 @@
             
             // Update the mode indicator to show customer name if in customer mode
             const modeIndicator = document.getElementById('modeIndicator');
+            const logoImage = document.getElementById('logoImage');
+            
             if (modeIndicator) {
                 if (state.userMode === 'customer') {
                     modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
@@ -1170,8 +1179,17 @@
                     if (shareBtn) {
                         shareBtn.style.display = 'none';
                     }
+                    // Also hide info button in customer mode
+                    const infoBtn = document.getElementById('infoBtn');
+                    if (infoBtn) {
+                        infoBtn.style.display = 'none';
+                    }
+                    // Make logo smaller in customer mode
+                    if (logoImage) {
+                        logoImage.style.height = '3rem';
+                    }
                 } else {
-                    modeIndicator.innerHTML = `<i class="fas fa-headset"></i> Receiver Mode`;
+                    modeIndicator.innerHTML = `<i class="fas fa-headset"></i> GGG Schreibdienst`;
                     modeIndicator.className = 'mode-indicator';
                     // Show buttons in receiver mode
                     if (typeof summaryBtn !== 'undefined' && summaryBtn) {
@@ -1182,6 +1200,15 @@
                     }
                     if (shareBtn) {
                         shareBtn.style.display = 'flex';
+                    }
+                    // Show info button in receiver mode
+                    const infoBtn = document.getElementById('infoBtn');
+                    if (infoBtn) {
+                        infoBtn.style.display = 'flex';
+                    }
+                    // Reset logo size in receiver mode
+                    if (logoImage) {
+                        logoImage.style.height = '4.5rem';
                     }
                 }
             }
@@ -1520,29 +1547,8 @@
         
         // Voice input functionality
         function startVoiceInput() {
-            // Check if we're on HTTPS (required for microphone access)
-            if (window.location.protocol !== 'https:') {
-                // Get the HTTPS URL
-                const httpsUrl = window.location.href.replace('http://', 'https://').replace(':3000', ':3443');
-                
-                // Show message about HTTPS requirement
-                addSystemMessage(`Voice input requires a secure connection (HTTPS). Please use the secure version at: ${httpsUrl}`);
-                showToast("Voice input requires HTTPS", "warning", 4000);
-                
-                // Add the HTTPS banner if not already present
-                if (!document.querySelector('meta[name="should-use-https"]')) {
-                    const header = document.querySelector('head');
-                    const meta = document.createElement('meta');
-                    meta.name = 'should-use-https';
-                    meta.content = 'true';
-                    header.appendChild(meta);
-                    
-                    // Show the banner
-                    checkForHttpsRecommendation();
-                }
-                
-                return;
-            }
+            // No HTTPS requirement for local testing
+            // Note: In a production environment, HTTPS would be required for microphone access
             
             // Check if running on Android
             const isAndroid = /Android/i.test(navigator.userAgent);
@@ -1871,35 +1877,68 @@
 
         async function callClaudeAPI(prompt) {
             try {
-                console.log("Calling Claude API through proxy server...");
+                console.log("Calling Claude API...");
                 
-                // Get the absolute URL for the API endpoint
-                const apiUrl = new URL('/api/claude', window.location.origin).toString();
+                // Use the API file in the same directory as the HTML file
+                const apiUrl = new URL('api.php', window.location.href.split('?')[0]).toString();
+                console.log("Using API endpoint:", apiUrl);
+                
                 console.log("API URL:", apiUrl);
                 console.log("API Key:", state.apiKey ? "Provided" : "Missing");
+                
+                // Log the data being sent (excluding the full API key)
+                const requestData = {
+                    apiKey: state.apiKey ? `${state.apiKey.substring(0, 5)}...${state.apiKey.substring(state.apiKey.length - 4)}` : null,
+                    model: state.model,
+                    promptLength: prompt?.length || 0
+                };
+                console.log("Request data:", requestData);
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         apiKey: state.apiKey,
                         model: state.model,
                         prompt: prompt
-                    })
+                    }),
+                    // Add credentials
+                    credentials: 'same-origin'
                 });
                 
+                // Log response details
                 console.log("Response status:", response.status);
+                console.log("Response headers:", {
+                    'content-type': response.headers.get('content-type'),
+                    'server': response.headers.get('server')
+                });
 
                 if (!response.ok) {
-                    try {
+                    // Check content type to determine how to handle the error
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        // Parse JSON error
                         const errorData = await response.json();
-                        console.error("API error response:", errorData);
+                        console.error("API JSON error response:", errorData);
                         throw new Error(`API error: ${errorData.error || response.statusText}`);
-                    } catch (jsonError) {
-                        throw new Error(`API error (${response.status}): ${response.statusText}`);
+                    } else {
+                        // Get text error
+                        const errorText = await response.text();
+                        console.error("API non-JSON error response:", errorText);
+                        throw new Error(`API error (${response.status}): ${response.statusText} - ${errorText.substring(0, 100)}`);
                     }
+                }
+                
+                // Check content type
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error("Non-JSON response received:", text.substring(0, 200) + "...");
+                    throw new Error("Received non-JSON response from API");
                 }
 
                 const data = await response.json();
@@ -1914,7 +1953,8 @@
                 }
             } catch (error) {
                 console.error('Claude API call failed:', error);
-                // Fall back to simulation if the server request fails
+                
+                // Fall back to simulation mode if API fails
                 console.log("Falling back to simulation mode");
                 return simulateTranslation(prompt);
             }
@@ -2018,7 +2058,7 @@
                 case 'claude':
                     return 'Translator';
                 case 'receiver':
-                    return `Receiver (${getLanguageName(state.baseLanguage)})`;
+                    return `GGG Schreibdienst (${getLanguageName(state.baseLanguage)})`;
                 case 'system':
                     return 'System';
                 case 'summary':
@@ -2223,76 +2263,99 @@
             // Add API key instructions
             addSystemMessage(`To use this application, please enter your Claude API key in the settings panel (⚙️). Click the ℹ️ icon for more information about how this application works.`);
             
-            // Test server connectivity
-            fetch('/api/test')
-                .then(res => res.json())
+            // First test with direct API endpoint
+            const basePath = window.location.pathname.includes('/public/') 
+                ? window.location.pathname.substring(0, window.location.pathname.indexOf('/public/') + 8) 
+                : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+            
+            const directApiUrl = window.location.origin + basePath + 'direct_api.php';
+            console.log("Testing direct API connectivity at:", directApiUrl);
+            
+            fetch(directApiUrl)
+                .then(res => {
+                    console.log('Direct API response status:', res.status);
+                    if (!res.ok) {
+                        throw new Error(`Direct API error: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
-                    console.log('Server connectivity test result:', data);
-                    addSystemMessage(`Server connection established. Server status: ${data.status}`);
-                    showToast('Server connected successfully', 'success');
+                    console.log('Direct API test successful:', data);
+                    addSystemMessage(`Direct API connection established: ${data.message}`);
+                    
+                    // Now test the regular API endpoint through .htaccess
+                    testApiWithHtaccess();
                 })
                 .catch(err => {
-                    console.error('Server connectivity test failed:', err);
-                    addSystemMessage(`Warning: Could not connect to server. API functionality may be limited. Error: ${err.message}`);
-                    showToast('Server connection failed', 'error');
+                    console.error('Direct API test failed:', err);
+                    addSystemMessage(`Warning: Direct API test failed. Error: ${err.message}`);
+                    
+                    // Try the regular API endpoint anyway
+                    testApiWithHtaccess();
                 });
+                
+            function testApiWithHtaccess() {
+                // Get direct URL to test.php
+                const basePath = window.location.pathname.includes('/public/') 
+                    ? window.location.pathname.substring(0, window.location.pathname.indexOf('/public/') + 8) 
+                    : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+                
+                const testUrl = window.location.origin + basePath + 'api/test.php';
+                console.log("Testing server connectivity at:", testUrl);
+                
+                fetch(testUrl)
+                    .then(res => {
+                        console.log('Server response status:', res.status);
+                        console.log('Server response headers:', {
+                            'content-type': res.headers.get('content-type'),
+                            'server': res.headers.get('server')
+                        });
+                        
+                        if (!res.ok) {
+                            throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+                        }
+                        
+                        if (!res.headers.get('content-type')?.includes('application/json')) {
+                            // If the response is not JSON, get the text and log it
+                            return res.text().then(text => {
+                                console.error('Non-JSON response received:', text);
+                                throw new Error('Server returned non-JSON response');
+                            });
+                        }
+                        
+                        return res.json();
+                    })
+                    .then(data => {
+                        console.log('Server connectivity test result:', data);
+                        addSystemMessage(`Server connection established. Server status: ${data.status}`);
+                        showToast('Server connected successfully', 'success');
+                        
+                        // Reset direct API flag if it was set
+                        window.useDirectApi = false;
+                    })
+                    .catch(err => {
+                        console.error('Server connectivity test failed:', err);
+                        addSystemMessage(`Warning: Could not connect to server via .htaccess routing. API functionality may be limited. Error: ${err.message}`);
+                        showToast('Server connection failed', 'error');
+                        
+                        // Try direct API for Claude as a fallback
+                        addSystemMessage("Will use direct API access as fallback for Claude API calls.");
+                        
+                        // Update to use direct PHP instead of .htaccess routing
+                        window.useDirectApi = true;
+                    });
+            }
         }
         
-        // Check if we should be using HTTPS for microphone access
+        // Function removed - no longer needed
         function checkForHttpsRecommendation() {
-            // Only show the recommendation if we're on HTTP and the server suggests HTTPS
-            if (window.location.protocol !== 'https:' && document.querySelector('meta[name="should-use-https"]')) {
-                const httpsUrl = window.location.href.replace('http://', 'https://').replace(':3000', ':3443');
-                
-                // Create the HTTPS suggestion banner
-                const httpsBanner = document.createElement('div');
-                httpsBanner.style.position = 'fixed';
-                httpsBanner.style.top = '0';
-                httpsBanner.style.left = '0';
-                httpsBanner.style.right = '0';
-                httpsBanner.style.backgroundColor = 'var(--warning-color)';
-                httpsBanner.style.color = 'white';
-                httpsBanner.style.padding = '10px 20px';
-                httpsBanner.style.textAlign = 'center';
-                httpsBanner.style.zIndex = '1000';
-                httpsBanner.style.display = 'flex';
-                httpsBanner.style.justifyContent = 'space-between';
-                httpsBanner.style.alignItems = 'center';
-                
-                httpsBanner.innerHTML = `
-                    <div>
-                        <i class="fas fa-microphone-slash"></i> 
-                        Voice input requires HTTPS. <a href="${httpsUrl}" style="color: white; text-decoration: underline; font-weight: bold;">Switch to secure version</a>
-                    </div>
-                    <button style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-                
-                document.body.insertBefore(httpsBanner, document.body.firstChild);
-                
-                // Add click handler to close button
-                httpsBanner.querySelector('button').addEventListener('click', () => {
-                    httpsBanner.remove();
-                    // Add parameter to prevent showing the banner again
-                    const newUrl = new URL(window.location);
-                    newUrl.searchParams.set('secure', 'false');
-                    window.history.replaceState({}, '', newUrl);
-                });
-            }
+            // Not used in HTTP-only version
+            return;
         }
         
         // Loading animation for the page
         document.addEventListener('DOMContentLoaded', () => {
-            // Check for HTTPS recommendation header
-            const shouldUseHttps = document.querySelector('meta[name="x-should-use-https"]');
-            if (!shouldUseHttps && window.location.protocol !== 'https:') {
-                const header = document.querySelector('head');
-                const meta = document.createElement('meta');
-                meta.name = 'should-use-https';
-                meta.content = 'true';
-                header.appendChild(meta);
-            }
+            // HTTP-only version, no HTTPS checks needed
             
             // Add loading overlay
             const loadingOverlay = document.createElement('div');
@@ -2346,8 +2409,7 @@
                 setTimeout(() => {
                     loadingOverlay.remove();
                     
-                    // Check if we should recommend HTTPS after loading
-                    checkForHttpsRecommendation();
+                    // No HTTPS checks needed
                 }, 500);
             }, 1000);
         });
