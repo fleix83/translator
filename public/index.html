@@ -1805,6 +1805,9 @@
             // Show typing indicator
             typingIndicator.classList.add('active');
 
+            // Check if it's a direct message to Claude (starts with @chat)
+            const isDirectChat = content.startsWith('@chat');
+            
             // Determine sender based on current mode
             const sender = state.userMode === 'customer' ? 'customer' : 'receiver';
             
@@ -1813,7 +1816,9 @@
                 id: Date.now().toString(),
                 sender,
                 content,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                // Add a flag for direct chat
+                isDirectChat: isDirectChat
             };
             
             state.messages.push(message);
@@ -1835,17 +1840,29 @@
 
         async function processThroughClaude(message) {
             try {
-                // Determine what we're asking Claude to do based on the sender
+                // Check if this is a direct message to Claude (starts with @chat)
+                const isDirectChat = message.isDirectChat || message.content.trim().startsWith('@chat');
                 let prompt;
-                const sourceLang = message.sender === 'customer' ? state.customerLanguage : state.baseLanguage;
-                const targetLang = message.sender === 'customer' ? state.baseLanguage : state.customerLanguage;
                 
-                if (message.sender === 'customer') {
-                    // Customer to Receiver (translate foreign language to base language)
-                    prompt = `I'm a customer speaking ${getLanguageName(sourceLang)}. Please translate the following message accurately to ${getLanguageName(targetLang)}, keeping the tone and intent. Only respond with the pure translation, nothing else: "${message.content}"`;
+                if (isDirectChat) {
+                    // Extract the actual message content (remove the @chat prefix)
+                    const directMessage = message.content.trim().substring('@chat'.length).trim();
+                    
+                    // Direct prompt to Claude without translation instructions
+                    prompt = directMessage;
+                    console.log("Direct chat mode - sending to Claude without translation:", directMessage);
                 } else {
-                    // Receiver to Customer (translate base language to foreign language)
-                    prompt = `I'm a service provider speaking ${getLanguageName(sourceLang)}. Please translate the following message accurately to ${getLanguageName(targetLang)}, keeping the tone and intent. Only respond with the pure translation, nothing else: "${message.content}"`;
+                    // Regular translation mode
+                    const sourceLang = message.sender === 'customer' ? state.customerLanguage : state.baseLanguage;
+                    const targetLang = message.sender === 'customer' ? state.baseLanguage : state.customerLanguage;
+                    
+                    if (message.sender === 'customer') {
+                        // Customer to Receiver (translate foreign language to base language)
+                        prompt = `I'm a customer speaking ${getLanguageName(sourceLang)}. Please translate the following message accurately to ${getLanguageName(targetLang)}, keeping the tone and intent. Only respond with the pure translation, nothing else: "${message.content}"`;
+                    } else {
+                        // Receiver to Customer (translate base language to foreign language)
+                        prompt = `I'm a service provider speaking ${getLanguageName(sourceLang)}. Please translate the following message accurately to ${getLanguageName(targetLang)}, keeping the tone and intent. Only respond with the pure translation, nothing else: "${message.content}"`;
+                    }
                 }
 
                 const response = await callClaudeAPI(prompt);
@@ -2262,6 +2279,9 @@
             
             // Add API key instructions
             addSystemMessage(`To use this application, please enter your Claude API key in the settings panel (⚙️). Click the ℹ️ icon for more information about how this application works.`);
+            
+            // Add direct chat instructions
+            addSystemMessage(`TIP: Start your message with "@chat" to speak directly with Claude without translation.`);
             
             // First test with direct API endpoint
             const basePath = window.location.pathname.includes('/public/') 
