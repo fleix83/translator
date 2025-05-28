@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160">
-  <g fill="#5468ff">
-    <!-- GGG Logo simplified version with blue color (#5468ff) -->
-    <path d="M30,40 C30,35 35,30 40,30 L160,30 C165,30 170,35 170,40 L170,120 C170,125 165,130 160,130 L40,130 C35,130 30,125 30,120 L30,40 Z M70,55 L70,105 L140,105 L140,90 L90,90 L90,55 L70,55 Z M50,55 L50,105 L60,105 L60,55 L50,55 Z" />
-  </g>
-</svg>

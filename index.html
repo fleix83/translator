@@ -1,0 +1,2174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#7c3aed">
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="receiver-mode">
+    <div class="wrapper">
+        <div class="header">
+            <div>
+                <img src="GGG_Wegweiser.png" alt="GGG Wegweiser Logo" id="logoImage" style="height: 4.5rem; width: auto; margin: 0px 30px;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span class="mode-indicator" id="modeIndicator"></span>
+                <button class="header-btn share-btn" id="shareBtn" title="Share conversation link">
+                    <i class="fas fa-share-alt"></i>
+                </button>
+                <button class="header-btn summary-btn" id="summaryBtn" title="Generate conversation summary">
+                    <i class="fas fa-clipboard-list"></i>
+                </button>
+                <button class="header-btn settings-btn" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="header-btn info-btn" id="infoBtn">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="info-panel panel" id="infoPanel" style="display: none; position: absolute; top: 5.5rem; right: 1rem; z-index: 100; width: 320px; max-height: 80vh; overflow-y: auto; border-top: 3px solid var(--secondary-color); animation: slideDown 0.3s ease;">
+            <h3 style="margin-bottom: 1rem; color: var(--secondary-color); font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-info-circle"></i> About Translator
+            </h3>
+            
+            <div style="margin-bottom: 1rem; background-color: var(--primary-light); border-radius: 8px; padding: 0.75rem; border-left: 3px solid var(--primary-color);">
+                <p style="margin-bottom: 0.75rem; font-size: 0.9rem; line-height: 1.5; color: var(--text-primary);">
+                    This application helps bridge language barriers by providing real-time translation between different languages.
+                </p>
+            </div>
+            
+            <p style="margin-bottom: 0.75rem; font-size: 0.9rem; line-height: 1.5; color: var(--text-primary);">
+                <i class="fas fa-server" style="color: var(--secondary-color); margin-right: 0.5rem;"></i>
+                <strong>Technical Details:</strong> Uses a Node.js backend proxy to communicate with the Claude API.
+            </p>
+            
+            <p style="margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">
+                <i class="fas fa-cogs" style="color: var(--secondary-color); margin-right: 0.5rem;"></i>
+                How it works:
+            </p>
+            
+            <ol style="margin-left: 1.75rem; margin-bottom: 1rem; font-size: 0.9rem; line-height: 1.6;">
+                <li>The frontend sends requests to our local server</li>
+                <li>The server forwards these requests to the Claude API</li>
+                <li>Claude's responses are returned to the frontend</li>
+            </ol>
+            
+            <div style="padding: 0.75rem; background-color: rgba(255, 247, 230, 0.5); border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--warning-color);">
+                <p style="font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center;">
+                    <i class="fas fa-key" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
+                    To use this application, you'll need to enter your Claude API key in the settings panel.
+                </p>
+            </div>
+            
+            <button id="closeInfoBtn" class="btn btn-primary" style="width: 100%;">Close <i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <!-- Messages will be added here -->
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            Someone is typing...
+        </div>
+
+        <div class="input-container">
+            <textarea class="input-field" id="messageInput" placeholder="Type a message..." rows="2"></textarea>
+            <button class="voice-btn" id="voiceBtn">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+    </div>
+
+    <!-- Share URL Modal -->
+    <div class="panel" id="shareModal" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 200; width: 90%; max-width: 400px; text-align: center;">
+        <h3 style="margin-bottom: 1rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <i class="fas fa-share-alt" style="color: var(--primary-color);"></i> Share Conversation
+        </h3>
+        
+        <!-- QR Code Section -->
+        <div style="margin-bottom: 1.5rem;">
+            <p style="margin-bottom: 1rem; font-size: 0.9rem;">Scan this QR code:</p>
+            <div id="qrcode" style="margin: 0 auto; width: 200px; height: 200px; background-color: white; padding: 10px; border-radius: 8px;"></div>
+            <button id="downloadQrBtn" class="btn" style="background-color: var(--success-color); color: white; border-radius: 8px; padding: 0.5rem 1rem; margin-top: 0.75rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.5rem;" disabled>
+                <i class="fas fa-download"></i> Download QR Code
+            </button>
+        </div>
+        
+        <!-- URL Section -->
+        <p style="margin-bottom: 0.75rem; font-size: 0.9rem;">Or copy this link:</p>
+        <div style="display: flex; margin-bottom: 1.5rem;">
+            <input type="text" id="shareUrlInput" readonly style="flex: 1; padding: 0.75rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px 0 0 8px; font-size: 0.9rem;">
+            <button id="copyShareUrlBtn" class="btn" style="background-color: var(--primary-color); color: white; border-radius: 0 8px 8px 0; padding: 0 1rem;">
+                <i class="fas fa-copy"></i>
+            </button>
+        </div>
+        <button id="closeShareModalBtn" class="btn btn-primary" style="width: 100%;">Close</button>
+    </div>
+
+    <!-- Modal Backdrop -->
+    <div id="modalBackdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 150;"></div>
+
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-group">
+            <h3>User Mode</h3>
+            <select id="userModeSelect">
+                <option value="customer">Customer (Foreign Language)</option>
+                <option value="receiver">Receiver (Base Language)</option>
+            </select>
+        </div>
+        <div class="settings-group">
+            <h3>Auto-Detect Device</h3>
+            <div class="toggle-container">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoDetectToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <label for="autoDetectToggle">
+                    Auto-detect mode based on screen size
+                </label>
+            </div>
+        </div>
+        <div class="settings-group">
+            <h3>Customer Name</h3>
+            <input type="text" id="customerNameInput" placeholder="Enter custom customer name">
+        </div>
+        <div class="settings-group">
+            <h3>Customer Language</h3>
+            <select id="customerLanguageSelect">
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="ja">Japanese</option>
+                <option value="zh">Chinese</option>
+                <option value="ru">Russian</option>
+                <option value="pt">Portuguese</option>
+                <option value="ar">Arabic</option>
+                <option value="hi">Hindi</option>
+                <option value="sr">Serbian</option>
+                <option value="sq">Albanian</option>
+                <option value="uk">Ukrainian</option>
+                <!-- Add more languages as needed -->
+            </select>
+        </div>
+        <div class="settings-group">
+            <h3>Base Language</h3>
+            <select id="baseLanguageSelect">
+                <option value="de" selected>German</option>
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="sr">Serbian</option>
+                <option value="sq">Albanian</option>
+                <option value="uk">Ukrainian</option>
+                <!-- Add more languages as needed -->
+            </select>
+        </div>
+        <div class="settings-group">
+            <h3>Claude API Key</h3>
+            <input type="password" id="apiKeyInput" placeholder="Enter your Claude API key">
+        </div>
+        <div class="settings-group">
+            <h3>Claude API Model</h3>
+            <select id="modelSelect">
+                <option value="claude-3-haiku-20240307" selected>Claude 3 Haiku</option>
+                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
+                <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
+                <option value="claude-4">Claude 4.0</option>
+            </select>
+        </div>
+        <div class="settings-group">
+            <h3>Summary Prompt</h3>
+            <textarea id="summaryPromptInput" rows="4" style="resize: vertical; font-size: 0.85rem; width: 100%;" placeholder="Customize the summary prompt here...">Please analyze the customer's messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.</textarea>
+        </div>
+        <div class="settings-group">
+            <h3>Show System Messages (Receiver Mode)</h3>
+            <div class="toggle-container">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showSystemReceiverToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <label for="showSystemReceiverToggle">
+                    Show system messages when in receiver mode
+                </label>
+            </div>
+        </div>
+        <div class="settings-group">
+            <h3>Show System Messages (Customer Mode)</h3>
+            <div class="toggle-container">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showSystemCustomerToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <label for="showSystemCustomerToggle">
+                    Show system messages when in customer mode
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase configuration - UPDATE THESE WITH YOUR ACTUAL VALUES
+        const SUPABASE_URL = 'https://dkycyakebbackkgdqqdj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRreWN5YWtlYmJhY2trZ2RxcWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyODE0MDcsImV4cCI6MjA2Mzg1NzQwN30._bsxGUqtXrfqyG7ljPjGoqrGnHD6wmb5eDCuoORRILk';
+
+        // Chat Manager Class for Supabase Realtime
+       // Updated ChatRealtimeManager with session creation
+        class ChatRealtimeManager {
+            constructor(supabaseUrl, supabaseKey, sessionToken) {
+                this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
+                this.sessionToken = sessionToken;
+                this.subscription = null;
+                this.messageCache = new Set();
+                this.messageCallbacks = [];
+                this.isInitialized = false;
+                this.sessionCreated = false;
+            }
+
+            async ensureSessionExists() {
+                if (this.sessionCreated) return true;
+                
+                try {
+                    console.log('Creating/checking session:', this.sessionToken);
+                    
+                    // Try to insert the session (will ignore if it already exists due to UNIQUE constraint)
+                    const { data, error } = await this.supabase
+                        .from('chat_sessions')
+                        .upsert({
+                            session_token: this.sessionToken,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                            expires_at: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString(),
+                            is_active: true
+                        }, {
+                            onConflict: 'session_token',
+                            ignoreDuplicates: false
+                        })
+                        .select();
+
+                    if (error && error.code !== '23505') { // 23505 is unique violation, which is OK
+                        console.error('Error creating session:', error);
+                        throw error;
+                    }
+                    
+                    console.log('Session ensured:', this.sessionToken);
+                    this.sessionCreated = true;
+                    return true;
+                } catch (error) {
+                    console.error('Failed to ensure session exists:', error);
+                    showToast('Failed to create session: ' + error.message, 'error');
+                    return false;
+                }
+            }
+
+            async testConnection() {
+                try {
+                    console.log('Testing Supabase connection...');
+                    
+                    // Test basic connection and ensure session exists
+                    await this.ensureSessionExists();
+                    
+                    const { data, error } = await this.supabase
+                        .from('chat_messages')
+                        .select('count(*)', { count: 'exact', head: true });
+                    
+                    if (error) {
+                        console.error('Supabase connection test failed:', error);
+                        showToast('Database connection failed: ' + error.message, 'error');
+                    } else {
+                        console.log('Supabase connection successful');
+                        showToast('Database connected successfully', 'success');
+                    }
+                } catch (error) {
+                    console.error('Connection test error:', error);
+                    showToast('Database connection error', 'error');
+                }
+            }
+
+            async subscribeToMessages() {
+                try {
+                    // Ensure session exists first
+                    const sessionOk = await this.ensureSessionExists();
+                    if (!sessionOk) {
+                        throw new Error('Failed to create session');
+                    }
+                    
+                    // Set up the subscription
+                    this.subscription = this.supabase
+                        .channel(`chat_messages:${this.sessionToken}`)
+                        .on(
+                            'postgres_changes',
+                            {
+                                event: 'INSERT',
+                                schema: 'public',
+                                table: 'chat_messages',
+                                filter: `session_token=eq.${this.sessionToken}`
+                            },
+                            (payload) => {
+                                console.log('Received real-time message:', payload);
+                                this.handleNewMessage(payload.new);
+                            }
+                        )
+                        .subscribe((status) => {
+                            console.log('Supabase subscription status:', status);
+                            if (status === 'SUBSCRIBED') {
+                                console.log('Successfully subscribed to chat messages');
+                                this.isInitialized = true;
+                                showToast('Real-time chat connected', 'success');
+                            } else if (status === 'CHANNEL_ERROR') {
+                                console.error('Supabase subscription error');
+                                showToast('Real-time connection failed', 'error');
+                            }
+                        });
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error setting up Supabase subscription:', error);
+                    showToast('Failed to connect to real-time chat', 'error');
+                    return false;
+                }
+            }
+
+            handleNewMessage(message) {
+                // Prevent processing the same message twice
+                if (this.messageCache.has(message.message_id)) {
+                    console.log('Duplicate message ignored:', message.message_id);
+                    return;
+                }
+
+                // Add to cache for deduplication
+                this.messageCache.add(message.message_id);
+
+                // Clean cache periodically (keep last 1000 messages)
+                if (this.messageCache.size > 1000) {
+                    const oldest = Array.from(this.messageCache).slice(0, 100);
+                    oldest.forEach(id => this.messageCache.delete(id));
+                }
+
+                // Convert Supabase message to app format
+                const appMessage = {
+                    id: message.message_id,
+                    sender: message.sender,
+                    content: message.content,
+                    timestamp: message.timestamp || message.created_at,
+                    isDirectChat: message.is_direct_chat || false
+                };
+
+                // Notify all registered callbacks
+                this.messageCallbacks.forEach(callback => {
+                    try {
+                        callback(appMessage);
+                    } catch (error) {
+                        console.error('Error in message callback:', error);
+                    }
+                });
+            }
+
+            onMessage(callback) {
+                this.messageCallbacks.push(callback);
+                
+                return () => {
+                    const index = this.messageCallbacks.indexOf(callback);
+                    if (index > -1) {
+                        this.messageCallbacks.splice(index, 1);
+                    }
+                };
+            }
+
+            async insertMessage(messageData) {
+                console.log('Attempting to insert message:', messageData);
+                
+                // Ensure session exists first
+                const sessionOk = await this.ensureSessionExists();
+                if (!sessionOk) {
+                    throw new Error('Cannot insert message: session creation failed');
+                }
+                
+                const message = {
+                    session_token: this.sessionToken,
+                    message_id: messageData.id || crypto.randomUUID(),
+                    sender: messageData.sender,
+                    content: messageData.content,
+                    client_timestamp: messageData.timestamp || new Date().toISOString(),
+                    is_direct_chat: messageData.isDirectChat || false
+                };
+
+                // Add to cache immediately to prevent echo
+                this.messageCache.add(message.message_id);
+
+                try {
+                    console.log('Inserting to Supabase:', message);
+                    
+                    const { data, error } = await this.supabase
+                        .from('chat_messages')
+                        .insert([message])
+                        .select();
+
+                    if (error) {
+                        console.error('Supabase insert error details:', {
+                            message: error.message,
+                            details: error.details,
+                            hint: error.hint,
+                            code: error.code,
+                            fullError: error
+                        });
+                        throw error;
+                    }
+                    
+                    console.log('Successfully inserted message:', data);
+                    return data[0];
+                } catch (error) {
+                    // Remove from cache if insert failed
+                    this.messageCache.delete(message.message_id);
+                    console.error('Failed to insert message:', error);
+                    
+                    // Show specific error message
+                    if (error.code === 'PGRST301') {
+                        showToast('Database table not found. Check your table name.', 'error');
+                    } else if (error.code === '23503') {
+                        showToast('Foreign key constraint failed. Session issue.', 'error');
+                    } else if (error.message.includes('permission denied')) {
+                        showToast('Permission denied. Check your RLS policies.', 'error');
+                    } else {
+                        showToast('Failed to save message: ' + error.message, 'error');
+                    }
+                    
+                    throw error;
+                }
+            }
+
+            async loadMessages(limit = 50) {
+                try {
+                    console.log('Loading messages for session:', this.sessionToken);
+                    
+                    // Ensure session exists first
+                    await this.ensureSessionExists();
+                    
+                    const { data, error } = await this.supabase
+                        .from('chat_messages')
+                        .select('*')
+                        .eq('session_token', this.sessionToken)
+                        .order('timestamp', { ascending: false })
+                        .limit(limit);
+
+                    if (error) {
+                        console.error('Error loading messages:', error);
+                        throw error;
+                    }
+
+                    console.log('Loaded messages:', data);
+
+                    // Add loaded messages to cache for deduplication
+                    data.forEach(message => {
+                        this.messageCache.add(message.message_id);
+                    });
+
+                    // Convert to app format and return in chronological order
+                    return data.reverse().map(msg => ({
+                        id: msg.message_id,
+                        sender: msg.sender,
+                        content: msg.content,
+                        timestamp: msg.timestamp || msg.created_at,
+                        isDirectChat: msg.is_direct_chat || false
+                    }));
+                } catch (error) {
+                    console.error('Failed to load messages:', error);
+                    showToast('Failed to load chat history: ' + error.message, 'error');
+                    return [];
+                }
+            }
+
+            async unsubscribe() {
+                if (this.subscription) {
+                    await this.supabase.removeChannel(this.subscription);
+                    this.subscription = null;
+                }
+                this.messageCallbacks = [];
+                this.messageCache.clear();
+                this.isInitialized = false;
+                this.sessionCreated = false;
+            }
+
+            getConnectionStatus() {
+                return this.subscription?.state || 'disconnected';
+            }
+        }
+
+        // Initialize chat function
+        async function initializeChat(sessionToken) {
+            try {
+                // Check if Supabase credentials are configured
+                if (SUPABASE_URL === 'your-supabase-url-here' || SUPABASE_ANON_KEY === 'your-supabase-anon-key-here') {
+                    console.warn('Supabase not configured - running in local mode only');
+                    addSystemMessage('Real-time sync disabled: Supabase credentials not configured. Messages will only be stored locally.');
+                    return null;
+                }
+
+                const chatManager = new ChatRealtimeManager(
+                    SUPABASE_URL,
+                    SUPABASE_ANON_KEY,
+                    sessionToken
+                );
+
+                // Subscribe to realtime messages
+                const subscribed = await chatManager.subscribeToMessages();
+                if (!subscribed) {
+                    console.error('Failed to subscribe to messages');
+                    return null;
+                }
+
+                // Listen for new messages from other devices
+                chatManager.onMessage((message) => {
+                    console.log('New message received from Supabase:', message);
+                    
+                    // Check if this message is already in our local state
+                    const existsLocally = state.messages.some(msg => msg.id === message.id);
+                    if (!existsLocally) {
+                        // Add to local state and render
+                        state.messages.push(message);
+                        renderMessages();
+                        
+                        // Save to localStorage
+                        localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
+                        
+                        // Show notification for messages from other devices
+                        if (message.sender !== state.userMode) {
+                            showToast(`New message from ${getSenderDisplayName(message.sender)}`, 'info');
+                        }
+                    }
+                });
+
+                // Load existing messages from Supabase
+                try {
+                    const existingMessages = await chatManager.loadMessages();
+                    if (existingMessages.length > 0) {
+                        // Merge with local messages, avoiding duplicates
+                        const mergedMessages = [...state.messages];
+                        existingMessages.forEach(msg => {
+                            if (!mergedMessages.some(localMsg => localMsg.id === msg.id)) {
+                                mergedMessages.push(msg);
+                            }
+                        });
+                        
+                        // Sort by timestamp
+                        mergedMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                        
+                        state.messages = mergedMessages;
+                        renderMessages();
+                        
+                        // Save merged messages to localStorage
+                        localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
+                        
+                        console.log(`Loaded ${existingMessages.length} messages from Supabase`);
+                    }
+                } catch (error) {
+                    console.error('Failed to load existing messages:', error);
+                }
+
+                return chatManager;
+            } catch (error) {
+                console.error('Failed to initialize chat manager:', error);
+                addSystemMessage('Real-time sync unavailable: Failed to connect to Supabase. Messages will only be stored locally.');
+                return null;
+            }
+        }
+
+        // DOM elements
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const userModeSelect = document.getElementById('userModeSelect');
+        const customerLanguageSelect = document.getElementById('customerLanguageSelect');
+        const baseLanguageSelect = document.getElementById('baseLanguageSelect');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const modelSelect = document.getElementById('modelSelect');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const summaryBtn = document.getElementById('summaryBtn');
+        const summaryPromptInput = document.getElementById('summaryPromptInput');
+        
+        // Detect if user is on mobile (customer) or desktop (receiver)
+        function detectDeviceType() {
+            return window.innerWidth < 768 ? 'customer' : 'receiver';
+        }
+
+        // Global chat manager instance
+        let globalChatManager = null;
+
+        // Token management functions
+        function generateSessionToken() {
+            // Use crypto API to generate a secure random token (UUID-like)
+            const array = new Uint8Array(16);
+            window.crypto.getRandomValues(array);
+            
+            // Format as UUID-like string
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+        
+        function getSessionToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let token = urlParams.get('session');
+            
+            // If no token in URL, generate one and update URL
+            if (!token) {
+                token = generateSessionToken();
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('session', token);
+                window.history.pushState({}, '', newUrl);
+            }
+            
+            return token;
+        }
+        
+        // Get or create session token
+        const sessionToken = getSessionToken();
+        console.log("Active session:", sessionToken.substring(0, 8) + '...');
+        
+        // Get URL parameters for settings
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Save API key from URL to localStorage if it exists
+        if (urlParams.get('apiKey')) {
+            localStorage.setItem('claudeApiKey', urlParams.get('apiKey'));
+        }
+        
+        // App state
+        const state = {
+            userMode: detectDeviceType(), // Auto-detect initial mode
+            customerLanguage: urlParams.get('customerLang') || 'fr',
+            baseLanguage: urlParams.get('baseLang') || 'de',
+            apiKey: urlParams.get('apiKey') || localStorage.getItem('claudeApiKey') || '',
+            model: 'claude-3-haiku-20240307', // Use Claude 3 Haiku which is known to work with the API key
+            messages: [],
+            autoModeDetection: true, // Flag to enable/disable auto detection
+            customerName: urlParams.get('customerName') || 'Customer', // Get from URL or use default
+            summaryPrompt: 'Please analyze the customer\'s messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.',
+            sessionToken: sessionToken,
+            sessionUpdated: Date.now() // Timestamp for expiry tracking
+        };
+
+        // Initialize chat manager after DOM is loaded
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('Initializing chat manager...');
+                globalChatManager = await initializeChat(sessionToken);
+                if (globalChatManager) {
+                    console.log('Chat manager initialized successfully!');
+                } else {
+                    console.log('Chat manager not initialized - running in local mode');
+                }
+            } catch (error) {
+                console.error('Failed to initialize chat manager:', error);
+            }
+        });
+
+        // Function to create prefixed localStorage keys
+        function getStorageKey(key) {
+            return `session_${state.sessionToken}_${key}`;
+        }
+        
+        // Check for session expiry (31 days = 2678400000 ms)
+        function checkSessionExpiry() {
+            // Go through all localStorage items to find sessions
+            const SESSION_EXPIRY = 31 * 24 * 60 * 60 * 1000; // 31 days in milliseconds
+            const now = Date.now();
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                // Look for session data
+                if (key.startsWith('session_') && key.includes('_timestamp')) {
+                    const sessionId = key.split('_')[1];
+                    const timestamp = parseInt(localStorage.getItem(key));
+                    
+                    // Check if session is expired
+                    if (now - timestamp > SESSION_EXPIRY) {
+                        console.log(`Removing expired session: ${sessionId}`);
+                        // Remove all data for this session
+                        for (let j = localStorage.length - 1; j >= 0; j--) {
+                            const itemKey = localStorage.key(j);
+                            if (itemKey.includes(`session_${sessionId}_`)) {
+                                localStorage.removeItem(itemKey);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Run expiry check
+        checkSessionExpiry();
+        
+        // Update timestamp for current session
+        localStorage.setItem(getStorageKey('timestamp'), Date.now().toString());
+        
+       // Initialize from localStorage if available for this session
+        const settingsKey = getStorageKey('settings');
+        // Prioritize URL parameters over saved settings
+        if (localStorage.getItem(settingsKey)) {
+            const savedSettings = JSON.parse(localStorage.getItem(settingsKey));
+            
+            // Only use saved settings for values not provided in URL
+            if (!urlParams.get('customerLang')) {
+                state.customerLanguage = savedSettings.customerLanguage || state.customerLanguage;
+            }
+            
+            if (!urlParams.get('baseLang')) {
+                state.baseLanguage = savedSettings.baseLanguage || state.baseLanguage;
+            }
+            
+            if (!urlParams.get('customerName')) {
+                state.customerName = savedSettings.customerName || state.customerName;
+            }
+            
+            state.userMode = savedSettings.userMode || state.userMode;
+            state.model = savedSettings.model || state.model;
+            state.autoModeDetection = savedSettings.autoModeDetection !== undefined 
+                ? savedSettings.autoModeDetection 
+                : state.autoModeDetection;
+            state.summaryPrompt = savedSettings.summaryPrompt || state.summaryPrompt;
+            
+            // Update UI to reflect saved settings
+            userModeSelect.value = state.userMode;
+            customerLanguageSelect.value = state.customerLanguage;
+            baseLanguageSelect.value = state.baseLanguage;
+            modelSelect.value = state.model;
+            
+            if (document.getElementById('autoDetectToggle')) {
+                document.getElementById('autoDetectToggle').checked = state.autoModeDetection;
+            }
+            
+            if (document.getElementById('customerNameInput')) {
+                document.getElementById('customerNameInput').value = state.customerName;
+            }
+            
+            if (summaryPromptInput) {
+                summaryPromptInput.value = state.summaryPrompt;
+            }
+            
+            // Restore toggle states with defaults: receiver=true, customer=false
+            if (document.getElementById('showSystemReceiverToggle')) {
+                document.getElementById('showSystemReceiverToggle').checked = 
+                    savedSettings.showSystemReceiver !== undefined ? savedSettings.showSystemReceiver : true;
+            }
+            
+            if (document.getElementById('showSystemCustomerToggle')) {
+                document.getElementById('showSystemCustomerToggle').checked = 
+                    savedSettings.showSystemCustomer !== undefined ? savedSettings.showSystemCustomer : false;
+            }
+        } else if (state.autoModeDetection) {
+            // If no saved settings but auto-detection is on, set mode based on screen size
+            state.userMode = detectDeviceType();
+            userModeSelect.value = state.userMode;
+        }
+        
+        // Make sure buttons are initially visible or hidden based on mode
+        if (summaryBtn) {
+            summaryBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
+        }
+        if (settingsBtn) {
+            settingsBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
+        }
+        
+        // Share button should only be visible in receiver mode
+        const shareBtn = document.getElementById('shareBtn');
+        if (shareBtn) {
+            shareBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
+        }
+        
+        // Info button should only be visible in receiver mode
+        const infoBtn = document.getElementById('infoBtn');
+        if (infoBtn) {
+            infoBtn.style.display = state.userMode === 'customer' ? 'none' : 'flex';
+        }
+
+        // Set interface based on current mode
+        updateInterfaceMode();
+
+        // Function to update the interface based on current mode
+        function updateInterfaceMode() {
+            document.body.className = state.userMode === 'customer' ? 'customer-mode' : 'receiver-mode';
+            
+            // Update the mode indicator to show customer name if in customer mode
+            const modeIndicator = document.getElementById('modeIndicator');
+            const logoImage = document.getElementById('logoImage');
+            
+            if (modeIndicator) {
+                if (state.userMode === 'customer') {
+                    modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
+                    modeIndicator.className = 'mode-indicator customer-badge';
+                    // Hide buttons in customer mode
+                    if (typeof summaryBtn !== 'undefined' && summaryBtn) {
+                        summaryBtn.style.display = 'none';
+                    }
+                    if (settingsBtn) {
+                        settingsBtn.style.display = 'none';
+                    }
+                    if (shareBtn) {
+                        shareBtn.style.display = 'none';
+                    }
+                    // Also hide info button in customer mode
+                    const infoBtn = document.getElementById('infoBtn');
+                    if (infoBtn) {
+                        infoBtn.style.display = 'none';
+                    }
+                    // Make logo smaller in customer mode
+                    if (logoImage) {
+                        logoImage.style.height = '3rem';
+                    }
+                } else {
+                    modeIndicator.innerHTML = `<i class="fas fa-headset"></i> GGG Schreibdienst`;
+                    modeIndicator.className = 'mode-indicator';
+                    // Show buttons in receiver mode
+                    if (typeof summaryBtn !== 'undefined' && summaryBtn) {
+                        summaryBtn.style.display = 'flex';
+                    }
+                    if (settingsBtn) {
+                        settingsBtn.style.display = 'flex';
+                    }
+                    if (shareBtn) {
+                        shareBtn.style.display = 'flex';
+                    }
+                    // Show info button in receiver mode
+                    const infoBtn = document.getElementById('infoBtn');
+                    if (infoBtn) {
+                        infoBtn.style.display = 'flex';
+                    }
+                    // Reset logo size in receiver mode
+                    if (logoImage) {
+                        logoImage.style.height = '4.5rem';
+                    }
+                }
+            }
+        }
+
+        // Populate API key from localStorage if available
+        if (state.apiKey) {
+            apiKeyInput.value = state.apiKey;
+        }
+
+        // Load chat history from localStorage if available for this session
+        const chatHistoryKey = getStorageKey('chatHistory');
+        if (localStorage.getItem(chatHistoryKey)) {
+            state.messages = JSON.parse(localStorage.getItem(chatHistoryKey));
+            renderMessages();
+        }
+        
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Get the settings icon element
+        const settingsIcon = settingsBtn.querySelector('i.fas.fa-cog');
+        
+        // Add click handler to both the button and the icon
+        function toggleSettingsPanel() {
+            settingsPanel.classList.toggle('active');
+            
+            // Hide info panel if it's open
+            if (document.getElementById('infoPanel').style.display === 'block') {
+                document.getElementById('infoPanel').style.display = 'none';
+            }
+        }
+        
+        settingsBtn.addEventListener('click', toggleSettingsPanel);
+        // Add a separate event listener for the icon to ensure clicks on it work
+        settingsIcon.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent multiple triggers
+            toggleSettingsPanel();
+        });
+        
+        // Info button event listener
+        document.getElementById('infoBtn').addEventListener('click', () => {
+            const infoPanel = document.getElementById('infoPanel');
+            infoPanel.style.display = infoPanel.style.display === 'block' ? 'none' : 'block';
+            
+            // Hide settings panel if it's open
+            settingsPanel.classList.remove('active');
+        });
+        
+        // Close info button event listener
+        document.getElementById('closeInfoBtn').addEventListener('click', () => {
+            document.getElementById('infoPanel').style.display = 'none';
+        });
+        
+        // Share button and modal functionality
+        const shareModal = document.getElementById('shareModal');
+        const modalBackdrop = document.getElementById('modalBackdrop');
+        const shareUrlInput = document.getElementById('shareUrlInput');
+        
+        // Open share modal
+        shareBtn.addEventListener('click', () => {
+            // Get the base URL with the session token
+            const url = new URL(window.location.href);
+            
+            // Add essential settings as parameters to the URL
+            // Add API key (if exists)
+            if (state.apiKey) {
+                url.searchParams.set('apiKey', state.apiKey);
+            }
+            
+            // Add customer name
+            url.searchParams.set('customerName', state.customerName);
+            
+            // Add customer language
+            url.searchParams.set('customerLang', state.customerLanguage);
+            
+            // Add base language
+            url.searchParams.set('baseLang', state.baseLanguage);
+            
+            // Generate the complete share URL
+            const shareUrl = url.toString();
+            shareUrlInput.value = shareUrl;
+            
+            // Show modal and backdrop
+            shareModal.style.display = 'block';
+            modalBackdrop.style.display = 'block';
+            
+            // Generate QR code
+            const qrcodeContainer = document.getElementById('qrcode');
+            // Clear any existing QR code
+            qrcodeContainer.innerHTML = '';
+            
+            try {
+                // Generate new QR code using image
+                QRCode.toDataURL(shareUrl, {
+                    width: 180,
+                    margin: 1,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, (error, url) => {
+                    if (error) {
+                        console.error('Error generating QR code:', error);
+                        // Show error in QR code container
+                        qrcodeContainer.innerHTML = `<p style="color: var(--error-color); padding: 20px;">Could not generate QR code</p>`;
+                    } else {
+                        // Create an image element with the QR code
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.alt = 'QR Code for sharing conversation';
+                        img.style.width = '100%';
+                        img.style.height = 'auto';
+                        img.style.maxWidth = '180px';
+                        img.style.display = 'block';
+                        img.style.margin = '0 auto';
+                        
+                        // Add the image to the container
+                        qrcodeContainer.appendChild(img);
+                        
+                        // Enable download button
+                        const downloadQrBtn = document.getElementById('downloadQrBtn');
+                        downloadQrBtn.disabled = false;
+                        
+                        // Store the dataURL for downloading
+                        downloadQrBtn.setAttribute('data-qr-url', url);
+                    }
+                });
+            } catch (e) {
+                console.error('QR code generation failed:', e);
+                qrcodeContainer.innerHTML = `<p style="color: var(--error-color); padding: 20px;">Could not generate QR code</p>`;
+                
+                // Disable download button
+                const downloadQrBtn = document.getElementById('downloadQrBtn');
+                downloadQrBtn.disabled = true;
+            }
+        });
+        
+        // Copy URL button functionality
+        document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+            // Use modern clipboard API if available, fallback to older method
+            const copyBtn = document.getElementById('copyShareUrlBtn');
+            const originalIcon = copyBtn.innerHTML;
+            
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(shareUrlInput.value)
+                    .then(() => {
+                        showToast('URL copied to clipboard', 'success');
+                        // Visual feedback
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = originalIcon;
+                        }, 1500);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                        // Fallback to old method
+                        shareUrlInput.select();
+                        document.execCommand('copy');
+                        showToast('URL copied to clipboard', 'success');
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = originalIcon;
+                        }, 1500);
+                    });
+            } else {
+                // Fallback for older browsers
+                shareUrlInput.select();
+                document.execCommand('copy');
+                showToast('URL copied to clipboard', 'success');
+                copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalIcon;
+                }, 1500);
+            }
+        });
+        
+        // Close share modal
+        document.getElementById('closeShareModalBtn').addEventListener('click', () => {
+            shareModal.style.display = 'none';
+            modalBackdrop.style.display = 'none';
+        });
+        
+        // Close modal when clicking on backdrop
+        modalBackdrop.addEventListener('click', () => {
+            shareModal.style.display = 'none';
+            modalBackdrop.style.display = 'none';
+        });
+        
+        // QR Code download button functionality
+        document.getElementById('downloadQrBtn').addEventListener('click', () => {
+            const downloadQrBtn = document.getElementById('downloadQrBtn');
+            const qrUrl = downloadQrBtn.getAttribute('data-qr-url');
+            
+            if (qrUrl) {
+                // Create a temporary link element
+                const downloadLink = document.createElement('a');
+                downloadLink.href = qrUrl;
+                downloadLink.download = 'translator-qr-code.png';
+                
+                // Trigger download
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                // Show toast
+                showToast('QR Code downloaded', 'success');
+            } else {
+                showToast('QR Code not available', 'error');
+            }
+        });
+
+        // Click outside panels to close them
+        document.addEventListener('click', (e) => {
+            // Close settings panel if clicked outside
+            if (!settingsPanel.contains(e.target) && e.target !== settingsBtn && !e.target.closest('.fa-cog')) {
+                settingsPanel.classList.remove('active');
+            }
+            
+            // Close info panel if clicked outside
+            const infoPanel = document.getElementById('infoPanel');
+            const infoBtn = document.getElementById('infoBtn');
+            if (infoPanel.style.display === 'block' && !infoPanel.contains(e.target) && e.target !== infoBtn && !e.target.closest('.fa-info-circle')) {
+                infoPanel.style.display = 'none';
+            }
+        });
+
+        // Settings change handlers
+        userModeSelect.addEventListener('change', (e) => {
+            state.userMode = e.target.value;
+            updateInterfaceMode();
+            saveSettings();
+        });
+
+        // Add event listener for auto detection toggle
+        if (document.getElementById('autoDetectToggle')) {
+            document.getElementById('autoDetectToggle').addEventListener('change', (e) => {
+                state.autoModeDetection = e.target.checked;
+                if (state.autoModeDetection) {
+                    // If turning auto detection on, immediately apply it
+                    state.userMode = detectDeviceType();
+                    userModeSelect.value = state.userMode;
+                    updateInterfaceMode();
+                }
+                saveSettings();
+            });
+        }
+
+        // Add resize listener to handle device orientation changes
+        window.addEventListener('resize', () => {
+            if (state.autoModeDetection) {
+                const newMode = detectDeviceType();
+                if (newMode !== state.userMode) {
+                    state.userMode = newMode;
+                    userModeSelect.value = state.userMode;
+                    updateInterfaceMode();
+                    // Add a system message about the mode change
+                    addSystemMessage(`Device type detected as ${newMode === 'customer' ? 'mobile' : 'desktop'}. Switched to ${newMode === 'customer' ? 'Customer' : 'Receiver'} mode.`);
+                    // Show toast notification
+                    showToast(`Switched to ${newMode === 'customer' ? 'Customer' : 'Receiver'} mode`, 'info');
+                }
+            }
+        });
+
+        customerLanguageSelect.addEventListener('change', (e) => {
+            state.customerLanguage = e.target.value;
+            saveSettings();
+        });
+
+        baseLanguageSelect.addEventListener('change', (e) => {
+            state.baseLanguage = e.target.value;
+            saveSettings();
+        });
+
+        apiKeyInput.addEventListener('change', (e) => {
+            state.apiKey = e.target.value;
+            localStorage.setItem('claudeApiKey', state.apiKey);
+            saveSettings();
+            
+            if (state.apiKey) {
+                showToast('API key saved', 'success');
+            } else {
+                showToast('API key removed', 'warning');
+            }
+        });
+        
+        // Add model selection listener
+        modelSelect.addEventListener('change', (e) => {
+            state.model = e.target.value;
+            saveSettings();
+            showToast(`Model changed to ${e.target.options[e.target.selectedIndex].text}`, 'info');
+        });
+        
+        // Add summary prompt input listener
+        if (summaryPromptInput) {
+            summaryPromptInput.addEventListener('change', (e) => {
+                state.summaryPrompt = e.target.value;
+                saveSettings();
+                showToast('Summary prompt updated', 'success');
+            });
+        }
+        
+        // Add summary button listener
+        if (summaryBtn) {
+            summaryBtn.addEventListener('click', generateConversationSummary);
+        }
+
+        // Customer name input listener
+        if (document.getElementById('customerNameInput')) {
+            document.getElementById('customerNameInput').addEventListener('change', (e) => {
+                state.customerName = e.target.value || 'Customer';
+                saveSettings();
+                // Update mode indicator if we're in customer mode
+                if (state.userMode === 'customer') {
+                    const modeIndicator = document.getElementById('modeIndicator');
+                    if (modeIndicator) {
+                        modeIndicator.innerHTML = `<i class="fas fa-user-circle"></i> ${state.customerName}`;
+                    }
+                }
+                // Update any existing customer messages in the UI
+                renderMessages();
+            });
+        }
+
+        // Toggle messages change listener
+        if (document.getElementById('showSystemReceiverToggle')) {
+            document.getElementById('showSystemReceiverToggle').addEventListener('change', (e) => {
+                // Re-render messages when toggle changes
+                renderMessages();
+                saveSettings();
+                showToast(`System messages ${e.target.checked ? 'shown' : 'hidden'} in receiver mode`, 'info');
+            });
+        }
+
+        if (document.getElementById('showSystemCustomerToggle')) {
+            document.getElementById('showSystemCustomerToggle').addEventListener('change', (e) => {
+                // Re-render messages when toggle changes
+                renderMessages();
+                saveSettings();
+                showToast(`System messages ${e.target.checked ? 'shown' : 'hidden'} in customer mode`, 'info');
+            });
+        }
+        
+        // Voice input button listener
+        const voiceBtn = document.getElementById('voiceBtn');
+        if (voiceBtn) {
+            voiceBtn.addEventListener('click', startVoiceInput);
+        }
+        
+        // Voice input functionality
+        function startVoiceInput() {
+            // No HTTPS requirement for local testing
+            // Note: In a production environment, HTTPS would be required for microphone access
+            
+            // Check if running on Android
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            
+            // Show helper toast for Android devices the first time
+            if (isAndroid) {
+                // Use localStorage to check if this is first time (per session)
+                const hasMicHint = sessionStorage.getItem('microphoneHintShown');
+                if (!hasMicHint) {
+                    showToast("Please allow microphone access when prompted", "info", 4000);
+                    sessionStorage.setItem('microphoneHintShown', 'true');
+                }
+            }
+            
+            // Check if speech recognition is supported
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                addSystemMessage("Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.");
+                showToast("Voice input not supported in this browser", "error");
+                return;
+            }
+            
+            try {
+                // Create speech recognition object
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                
+                // Get appropriate language code based on user mode
+                let langCode = 'en-US'; // Default fallback
+                
+                if (state.userMode === 'customer') {
+                    // Map language codes to BCP 47 language tags for speech recognition
+                    const langMap = {
+                        'en': 'en-US',
+                        'fr': 'fr-FR',
+                        'es': 'es-ES',
+                        'de': 'de-DE',
+                        'it': 'it-IT',
+                        'ja': 'ja-JP',
+                        'zh': 'zh-CN',
+                        'ru': 'ru-RU',
+                        'pt': 'pt-BR',
+                        'ar': 'ar-SA',
+                        'hi': 'hi-IN',
+                        'sr': 'sr-RS',
+                        'sq': 'sq-AL',
+                        'uk': 'uk-UA'
+                    };
+                    langCode = langMap[state.customerLanguage] || 'en-US';
+                } else {
+                    // Map for base language
+                    const langMap = {
+                        'en': 'en-US',
+                        'fr': 'fr-FR',
+                        'es': 'es-ES',
+                        'de': 'de-DE',
+                        'sr': 'sr-RS',
+                        'sq': 'sq-AL',
+                        'uk': 'uk-UA'
+                    };
+                    langCode = langMap[state.baseLanguage] || 'en-US';
+                }
+                
+                // Configure speech recognition
+                recognition.lang = langCode;
+                recognition.continuous = true; // Enable continuous recognition
+                recognition.interimResults = true;
+                recognition.maxAlternatives = 1;
+                // Increase timeout duration
+                const speechTimeout = 12000; // 12 seconds
+                
+                // Show recording indicator
+                voiceBtn.style.backgroundColor = 'var(--error-color)';
+                voiceBtn.innerHTML = '<i class="fas fa-circle" style="animation: pulse 1.5s infinite"></i>';
+                showToast(`Listening in ${getLanguageName(state.userMode === 'customer' ? state.customerLanguage : state.baseLanguage)}...`, "info");
+                
+                // Temporary variable to store interim results
+                let interimTranscript = '';
+                
+                // Create a flag to track speech recognition state
+                let isRecognitionActive = true;
+                
+                // Start recording with timeout
+                try {
+                    recognition.start();
+                    console.log('Speech recognition started successfully');
+                } catch (startError) {
+                    console.error('Error starting speech recognition:', startError);
+                    showToast("Could not start speech recognition. Please try again.", "error");
+                    isRecognitionActive = false;
+                    
+                    // Reset button state
+                    voiceBtn.style.backgroundColor = 'var(--success-color)';
+                    voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    return;
+                }
+                
+                // Set a timeout to prevent silent errors
+                const speechTimeoutHandler = setTimeout(() => {
+                    if (isRecognitionActive) {
+                        try {
+                            recognition.stop();
+                            isRecognitionActive = false;
+                        } catch (stopError) {
+                            console.error('Error stopping speech recognition:', stopError);
+                        }
+                        showToast("Voice input timed out. Please try again and speak clearly.", "warning");
+                        // Reset button state
+                        voiceBtn.style.backgroundColor = 'var(--success-color)';
+                        voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    }
+                }, speechTimeout);
+                
+                // Handle interim results
+                recognition.onresult = function(event) {
+                    console.log('Speech recognition result received');
+                    interimTranscript = '';
+                    let finalTranscript = '';
+                    
+                    // Get transcript from all results
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    
+                    // Update input field with results
+                    if (finalTranscript !== '') {
+                        messageInput.value = finalTranscript;
+                    } else {
+                        messageInput.value = interimTranscript;
+                    }
+                    
+                    // Reset the timeout since we're getting results
+                    clearTimeout(speechTimeoutHandler);
+                    speechTimeoutHandler = setTimeout(() => {
+                        if (isRecognitionActive) {
+                            try {
+                                recognition.stop();
+                                isRecognitionActive = false;
+                            } catch (stopError) {
+                                console.error('Error stopping speech recognition:', stopError);
+                            }
+                        }
+                    }, speechTimeout);
+                };
+                
+                // Handle errors
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error', event.error);
+                    
+                    // Check if running on Android
+                    const isAndroid = /Android/i.test(navigator.userAgent);
+                    
+                    // Handle different error types
+                    switch(event.error) {
+                        case 'no-speech':
+                            showToast("No speech detected, please try again", "warning");
+                            break;
+                        case 'aborted':
+                            // Aborted errors can happen during normal operation, so we don't show an error
+                            console.log('Speech recognition aborted');
+                            break;
+                        case 'audio-capture':
+                            showToast("No microphone detected. Please check your device settings.", "error");
+                            break;
+                        case 'network':
+                            showToast("Network error occurred. Please check your connection.", "error");
+                            break;
+                        case 'not-allowed':
+                            if (isAndroid) {
+                                // More specific guidance for Android users
+                                showToast("Please allow microphone access in your Chrome settings", "error", 5000);
+                                addSystemMessage("To enable microphone on Android:\n1. Tap the address bar\n2. Tap the info/lock icon\n3. Tap Site Settings\n4. Set Microphone to Allow");
+                            } else {
+                                showToast("Microphone access denied. Please allow microphone access in your browser.", "error");
+                            }
+                            break;
+                        default:
+                            showToast(`Voice input error: ${event.error}`, "error");
+                    }
+                    
+                    // Reset button state
+                    voiceBtn.style.backgroundColor = 'var(--success-color)';
+                    voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                };
+                
+                // Handle end of speech
+                recognition.onend = function() {
+                    console.log('Speech recognition ended');
+                    // Clear the timeout when speech recognition ends
+                    clearTimeout(speechTimeoutHandler);
+                    isRecognitionActive = false;
+                    
+                    // Reset button state
+                    voiceBtn.style.backgroundColor = 'var(--success-color)';
+                    voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    
+                    if (messageInput.value.trim() !== '') {
+                        showToast("Voice input captured", "success");
+                    }
+                };
+                
+                // Add safety cleanup to ensure recognition is stopped
+                window.addEventListener('beforeunload', function() {
+                    if (isRecognitionActive) {
+                        try {
+                            recognition.stop();
+                        } catch (e) {
+                            console.log('Error stopping recognition on page unload');
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing speech recognition:', error);
+                showToast("Failed to initialize voice input", "error");
+                
+                // Reset button state
+                voiceBtn.style.backgroundColor = 'var(--success-color)';
+                voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                return null;
+            }
+            
+            // Return the recognition object for external control
+            return recognition;
+        }
+
+        // Functions
+        function saveSettings() {
+        const settingsKey = getStorageKey('settings');
+        localStorage.setItem(settingsKey, JSON.stringify({
+            userMode: state.userMode,
+            customerLanguage: state.customerLanguage,
+            baseLanguage: state.baseLanguage,
+            model: state.model,
+            autoModeDetection: state.autoModeDetection,
+            customerName: state.customerName,
+            summaryPrompt: state.summaryPrompt,
+            showSystemReceiver: document.getElementById('showSystemReceiverToggle')?.checked ?? true,
+            showSystemCustomer: document.getElementById('showSystemCustomerToggle')?.checked ?? false
+        }));
+        
+        // Update session timestamp
+        localStorage.setItem(getStorageKey('timestamp'), Date.now().toString());
+    }
+
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content) return;
+
+            // Clear input
+            messageInput.value = '';
+
+            // Show typing indicator
+            typingIndicator.classList.add('active');
+
+            // Check if it's a direct message to Claude (starts with @chat)
+            const isDirectChat = content.startsWith('@chat');
+            
+            // Determine sender based on current mode
+            const sender = state.userMode === 'customer' ? 'customer' : 'receiver';
+            
+            // Add message to state and UI
+            const message = {
+                id: Date.now().toString(),
+                sender,
+                content,
+                timestamp: new Date().toISOString(),
+                // Add a flag for direct chat
+                isDirectChat: isDirectChat
+            };
+            
+            state.messages.push(message);
+            renderMessages();
+            
+            // Save to localStorage with session token
+            localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
+
+            // Try to save to Supabase if available
+            if (globalChatManager) {
+                try {
+                    await globalChatManager.insertMessage(message);
+                    console.log('Message saved to Supabase');
+                } catch (error) {
+                    console.error('Failed to save message to Supabase:', error);
+                    showToast('Message saved locally only', 'warning');
+                }
+            }
+
+            // If API key is set, process through Claude
+            if (state.apiKey) {
+                processThroughClaude(message);
+            } else {
+                // If no API key, hide typing indicator
+                typingIndicator.classList.remove('active');
+                // Show message to set API key
+                addSystemMessage("Please set your Claude API key in the settings.");
+            }
+        }
+
+        async function processThroughClaude(message) {
+            try {
+                // Check if this is a direct message to Claude (starts with @chat)
+                const isDirectChat = message.isDirectChat || message.content.trim().startsWith('@chat');
+                let prompt;
+                
+                if (isDirectChat) {
+                    // Extract the actual message content (remove the @chat prefix)
+                    const directMessage = message.content.trim().substring('@chat'.length).trim();
+                    
+                    // Direct prompt to Claude without translation instructions
+                    prompt = directMessage;
+                    console.log("Direct chat mode - sending to Claude without translation:", directMessage);
+                } else {
+                    // Regular translation mode
+                    const sourceLang = message.sender === 'customer' ? state.customerLanguage : state.baseLanguage;
+                    const targetLang = message.sender === 'customer' ? state.baseLanguage : state.customerLanguage;
+                    
+                    if (message.sender === 'customer') {
+                        // Customer to Receiver (translate foreign language to base language)
+                        prompt = `I'm a customer speaking ${getLanguageName(sourceLang)}. Please translate the following message accurately to ${getLanguageName(targetLang)}, keeping the tone and intent. Only respond with the pure translation, nothing else: "${message.content}"`;
+                    } else {
+                        // Receiver to Customer (translate base language to foreign language)
+                        prompt = `I'm a service provider speaking ${getLanguageName(sourceLang)}. Please translate the following message accurately to ${getLanguageName(targetLang)}, keeping the tone and intent. Only respond with the pure translation, nothing else: "${message.content}"`;
+                    }
+                }
+
+                // Enable web search for direct chat messages
+                const response = await callClaudeAPI(prompt, isDirectChat);
+                
+                // Hide typing indicator
+                typingIndicator.classList.remove('active');
+
+                if (response) {
+                    // Add Claude's response to the chat
+                    const claudeMessage = {
+                        id: Date.now().toString(),
+                        sender: 'claude',
+                        content: response,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    state.messages.push(claudeMessage);
+                    renderMessages();
+                    
+                    // Save to localStorage with session token
+                    localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
+
+                    // Try to save Claude's response to Supabase if available
+                    if (globalChatManager) {
+                        try {
+                            await globalChatManager.insertMessage(claudeMessage);
+                            console.log('Claude response saved to Supabase');
+                        } catch (error) {
+                            console.error('Failed to save Claude response to Supabase:', error);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing through Claude:', error);
+                typingIndicator.classList.remove('active');
+                addSystemMessage(`Error: ${error.message}`);
+            }
+        }
+
+        async function callClaudeAPI(prompt, enableWebSearch = false) {
+            try {
+                console.log("Calling Claude API...");
+                
+                // Use the API file in the same directory as the HTML file
+                const apiUrl = new URL('api.php', window.location.href.split('?')[0]).toString();
+                console.log("Using API endpoint:", apiUrl);
+                
+                console.log("API URL:", apiUrl);
+                console.log("API Key:", state.apiKey ? "Provided" : "Missing");
+                
+                // Prepare request body
+                const requestBody = {
+                    apiKey: state.apiKey,
+                    model: state.model,
+                    prompt: prompt
+                };
+                
+                // Enable web search if requested
+                if (enableWebSearch) {
+                    requestBody.enableWebSearch = true;
+                    requestBody.maxSearches = 5;
+                    console.log("Web search enabled for this request");
+                }
+                
+                // Log the data being sent (excluding the full API key)
+                const requestData = {
+                    apiKey: state.apiKey ? `${state.apiKey.substring(0, 5)}...${state.apiKey.substring(state.apiKey.length - 4)}` : null,
+                    model: state.model,
+                    promptLength: prompt?.length || 0,
+                    webSearchEnabled: enableWebSearch
+                };
+                console.log("Request data:", requestData);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    // Add credentials
+                    credentials: 'same-origin'
+                });
+                
+                // Log response details
+                console.log("Response status:", response.status);
+                console.log("Response headers:", {
+                    'content-type': response.headers.get('content-type'),
+                    'server': response.headers.get('server')
+                });
+
+                if (!response.ok) {
+                    // Check content type to determine how to handle the error
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        // Parse JSON error
+                        const errorData = await response.json();
+                        console.error("API JSON error response:", errorData);
+                        throw new Error(`API error: ${errorData.error || response.statusText}`);
+                    } else {
+                        // Get text error
+                        const errorText = await response.text();
+                        console.error("API non-JSON error response:", errorText);
+                        throw new Error(`API error (${response.status}): ${response.statusText} - ${errorText.substring(0, 100)}`);
+                    }
+                }
+                
+                // Check content type
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error("Non-JSON response received:", text.substring(0, 200) + "...");
+                    throw new Error("Received non-JSON response from API");
+                }
+
+                const data = await response.json();
+                console.log("Claude API response received:", data);
+                
+                // Check if the response has the expected structure
+                if (data && data.content && data.content[0] && data.content[0].text) {
+                    return data.content[0].text;
+                } else {
+                    console.error("Unexpected API response structure:", data);
+                    throw new Error("Unexpected API response format");
+                }
+            } catch (error) {
+                console.error('Claude API call failed:', error);
+                
+                // Fall back to simulation mode if API fails
+                console.log("Falling back to simulation mode");
+                return simulateTranslation(prompt);
+            }
+        }
+        
+        // Function to simulate translation for prototype demonstration
+        function simulateTranslation(prompt) {
+            // Extract the original message from the prompt
+            const messageMatch = prompt.match(/"(.*?)"/);
+            let originalMessage = messageMatch ? messageMatch[1] : "No message found";
+            
+            // Determine if we're translating from customer to receiver or vice versa
+            const isCustomerToReceiver = prompt.includes(`I'm a customer speaking`);
+            
+            if (isCustomerToReceiver) {
+                // Simulate translation with error message
+                return `[API ERROR - FALLBACK TRANSLATION]\n\nTranslated message:\n${originalMessage}\n\n---\n\nThis is a fallback translation because an error occurred when calling the Claude API. Please check your API key and internet connection, then try again.`;
+            } else {
+                // Simulate translation from receiver to customer
+                return `[API ERROR - FALLBACK TRANSLATION]\n\nTranslated message:\n${originalMessage}\n\n---\n\nThis is a fallback translation because an error occurred when calling the Claude API. Please check your API key and internet connection, then try again.`;
+            }
+        }
+
+        function renderMessages() {
+    // Clear chat container
+    chatContainer.innerHTML = '';
+    
+    // Get current toggle states
+    const showSystemReceiver = document.getElementById('showSystemReceiverToggle')?.checked ?? true;
+    const showSystemCustomer = document.getElementById('showSystemCustomerToggle')?.checked ?? false;
+    
+    // Add each message
+    state.messages.forEach(message => {
+        // Check if we should skip system messages based on current mode and toggle settings
+        if (message.sender === 'system') {
+            if (state.userMode === 'receiver' && !showSystemReceiver) {
+                return; // Skip this message
+            }
+            if (state.userMode === 'customer' && !showSystemCustomer) {
+                return; // Skip this message
+            }
+        }
+        
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        
+        // Add appropriate class based on sender
+        switch (message.sender) {
+            case 'customer':
+                messageElement.classList.add('customer-message');
+                break;
+            case 'claude':
+                messageElement.classList.add('claude-message');
+                break;
+            case 'receiver':
+                messageElement.classList.add('receiver-message');
+                break;
+            case 'system':
+                messageElement.classList.add('claude-message');
+                break;
+            case 'summary':
+                messageElement.classList.add('summary-message');
+                break;
+        }
+        
+        // Add sender name
+        const senderElement = document.createElement('div');
+        senderElement.classList.add('sender');
+        senderElement.textContent = getSenderDisplayName(message.sender);
+        messageElement.appendChild(senderElement);
+        
+        // Add content
+        const contentElement = document.createElement('div');
+        contentElement.classList.add('content');
+        contentElement.textContent = message.content;
+        messageElement.appendChild(contentElement);
+        
+        // Add copy button for summary messages
+        if (message.sender === 'summary') {
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+            copyBtn.title = 'Copy summary to clipboard';
+            copyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(message.content)
+                    .then(() => {
+                        showToast('Summary copied to clipboard', 'success');
+                        // Change icon temporarily to show success
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                        }, 1500);
+                    })
+                    .catch(err => {
+                        console.error('Error copying text: ', err);
+                        showToast('Failed to copy to clipboard', 'error');
+                    });
+            });
+            messageElement.appendChild(copyBtn);
+        }
+        
+        // Add to chat container
+        chatContainer.appendChild(messageElement);
+    });
+    
+    // Scroll to bottom
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+        function getSenderDisplayName(sender) {
+            switch (sender) {
+                case 'customer':
+                    return `${state.customerName} (${getLanguageName(state.customerLanguage)})`;
+                case 'claude':
+                    return 'Translator';
+                case 'receiver':
+                    return `GGG Schreibdienst (${getLanguageName(state.baseLanguage)})`;
+                case 'system':
+                    return 'System';
+                case 'summary':
+                    return 'Zusammenfassung';
+                default:
+                    return sender;
+            }
+        }
+
+        function getLanguageName(langCode) {
+            const languages = {
+                'en': 'English',
+                'fr': 'French',
+                'es': 'Spanish',
+                'de': 'German',
+                'it': 'Italian',
+                'ja': 'Japanese',
+                'zh': 'Chinese',
+                'ru': 'Russian',
+                'pt': 'Portuguese',
+                'ar': 'Arabic',
+                'hi': 'Hindi',
+                'sr': 'Serbian',
+                'sq': 'Albanian',
+                'uk': 'Ukrainian'
+            };
+            return languages[langCode] || langCode;
+        }
+
+        async function addSystemMessage(text) {
+            const systemMessage = {
+                id: Date.now().toString(),
+                sender: 'system',
+                content: text,
+                timestamp: new Date().toISOString()
+            };
+            
+            state.messages.push(systemMessage);
+            renderMessages();
+            
+            // Save to localStorage with session token
+            localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
+
+            // Try to save to Supabase if available
+            if (globalChatManager) {
+                try {
+                    await globalChatManager.insertMessage(systemMessage);
+                } catch (error) {
+                    console.error('Failed to save system message to Supabase:', error);
+                }
+            }
+            
+            // Add toast notification for important system messages
+            showToast(text, 'info');
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'info', duration = 4000) {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container';
+                document.body.appendChild(toastContainer);
+                
+                // Add toast container styles
+                const style = document.createElement('style');
+                style.textContent = `
+                    .toast-container {
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        z-index: 9999;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                        max-width: 300px;
+                    }
+                    .toast {
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        animation: slideIn 0.3s ease, fadeOut 0.5s ease 3.5s forwards;
+                        cursor: pointer;
+                        font-size: 0.9rem;
+                        color: var(--text-primary);
+                        max-width: 100%;
+                    }
+                    .toast-info {
+                        background-color: var(--primary-color);
+                        border-left: 4px solid var(--primary-dark);
+                    }
+                    .toast-success {
+                        background-color: var(--success-color);
+                        border-left: 4px solid #065f46;
+                    }
+                    .toast-warning {
+                        background-color: var(--warning-color);
+                        border-left: 4px solid #92400e;
+                    }
+                    .toast-error {
+                        background-color: var(--error-color);
+                        border-left: 4px solid #991b1b;
+                    }
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes fadeOut {
+                        from { opacity: 1; }
+                        to { opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            // Add icon based on type
+            let icon = '';
+            switch (type) {
+                case 'info': icon = '<i class="fas fa-info-circle" style="color: white;"></i>'; break;
+                case 'success': icon = '<i class="fas fa-check-circle" style="color: white;"></i>'; break;
+                case 'warning': icon = '<i class="fas fa-exclamation-triangle" style="color: white;"></i>'; break;
+                case 'error': icon = '<i class="fas fa-times-circle" style="color: white;"></i>'; break;
+            }
+            toast.innerHTML = `${icon}<span style="color: white;">${message}</span>`;
+            
+            // Add click handler to dismiss
+            toast.addEventListener('click', () => {
+                toast.remove();
+            });
+            
+            // Add to container and auto-remove after animation
+            toastContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, duration);
+        }
+
+        // Function to generate conversation summary
+        async function generateConversationSummary() {
+            // Check if there are any customer messages
+            const customerMessages = state.messages.filter(msg => msg.sender === 'customer');
+            if (customerMessages.length === 0) {
+                showToast('No customer messages to summarize', 'warning');
+                return;
+            }
+            
+            // Check if API key is set
+            if (!state.apiKey) {
+                showToast('API key is required for summaries', 'error');
+                addSystemMessage("Please set your Claude API key in the settings to use the summary feature.");
+                return;
+            }
+            
+            // Show typing indicator
+            typingIndicator.classList.add('active');
+            
+            try {
+                // Build conversation history formatted string
+                const conversationHistory = customerMessages.map(msg => {
+                    const timestamp = new Date(msg.timestamp).toLocaleTimeString();
+                    return `[${timestamp}] ${state.customerName}: ${msg.content}`;
+                }).join('\n\n');
+                
+                // Create prompt for Claude with explicit instruction to use base language
+                const prompt = `${state.summaryPrompt}\n\nVery important: Your response MUST be in ${getLanguageName(state.baseLanguage)} language only.\n\nHere are the customer messages:\n\n${conversationHistory}`;
+                
+                // Call Claude API with the summary prompt
+                const response = await callClaudeAPI(prompt);
+                
+                // Hide typing indicator
+                typingIndicator.classList.remove('active');
+                
+                if (response) {
+                    // Add summary to the chat
+                    const summaryMessage = {
+                        id: Date.now().toString(),
+                        sender: 'summary',
+                        content: response,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    state.messages.push(summaryMessage);
+                    renderMessages();
+                    
+                    // Save to localStorage with session token
+                    localStorage.setItem(getStorageKey('chatHistory'), JSON.stringify(state.messages));
+
+                    // Try to save summary to Supabase if available
+                    if (globalChatManager) {
+                        try {
+                            await globalChatManager.insertMessage(summaryMessage);
+                            console.log('Summary saved to Supabase');
+                        } catch (error) {
+                            console.error('Failed to save summary to Supabase:', error);
+                        }
+                    }
+                    
+                    // Show success notification
+                    showToast('Summary generated', 'success');
+                }
+            } catch (error) {
+                console.error('Error generating summary:', error);
+                typingIndicator.classList.remove('active');
+                addSystemMessage(`Error generating summary: ${error.message}`);
+            }
+        }
+        
+        // Add device info to welcome message
+        if (state.messages.length === 0) {
+            const deviceType = detectDeviceType();
+            addSystemMessage(`Welcome to the Translator. Your device has been detected as ${deviceType === 'customer' ? 'MOBILE (Customer Mode)' : 'DESKTOP (Receiver Mode)'}. You can change this in settings if needed.`);
+            
+            // Add API key instructions
+            addSystemMessage(`To use this application, please enter your Claude API key in the settings panel (⚙️). Click the ℹ️ icon for more information about how this application works.`);
+            
+            // Add direct chat instructions
+            addSystemMessage(`TIP: Start your message with "@chat" to speak directly with Claude without translation.`);
+
+            // Add Supabase status message
+            if (SUPABASE_URL === 'your-supabase-url-here' || SUPABASE_ANON_KEY === 'your-supabase-anon-key-here') {
+                addSystemMessage(`Real-time sync is disabled. Configure Supabase credentials in the code to enable cross-device synchronization.`);
+            } else {
+                addSystemMessage(`Real-time sync is enabled. Messages will be synchronized across all devices sharing this session.`);
+            }
+            
+            // First test with direct API endpoint
+            const basePath = window.location.pathname.includes('/public/') 
+                ? window.location.pathname.substring(0, window.location.pathname.indexOf('/public/') + 8) 
+                : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+            
+            const directApiUrl = window.location.origin + basePath + 'direct_api.php';
+            console.log("Testing direct API connectivity at:", directApiUrl);
+            
+            fetch(directApiUrl)
+                .then(res => {
+                    console.log('Direct API response status:', res.status);
+                    if (!res.ok) {
+                        throw new Error(`Direct API error: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Direct API test successful:', data);
+                    addSystemMessage(`Direct API connection established: ${data.message}`);
+                    
+                    // Now test the regular API endpoint through .htaccess
+                    testApiWithHtaccess();
+                })
+                .catch(err => {
+                    console.error('Direct API test failed:', err);
+                    addSystemMessage(`Warning: Direct API test failed. Error: ${err.message}`);
+                    
+                    // Try the regular API endpoint anyway
+                    testApiWithHtaccess();
+                });
+                
+            function testApiWithHtaccess() {
+                // Get direct URL to test.php
+                const basePath = window.location.pathname.includes('/public/') 
+                    ? window.location.pathname.substring(0, window.location.pathname.indexOf('/public/') + 8) 
+                    : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+                
+                const testUrl = window.location.origin + basePath + 'api/test.php';
+                console.log("Testing server connectivity at:", testUrl);
+                
+                fetch(testUrl)
+                    .then(res => {
+                        console.log('Server response status:', res.status);
+                        console.log('Server response headers:', {
+                            'content-type': res.headers.get('content-type'),
+                            'server': res.headers.get('server')
+                        });
+                        
+                        if (!res.ok) {
+                            throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+                        }
+                        
+                        if (!res.headers.get('content-type')?.includes('application/json')) {
+                            // If the response is not JSON, get the text and log it
+                            return res.text().then(text => {
+                                console.error('Non-JSON response received:', text);
+                                throw new Error('Server returned non-JSON response');
+                            });
+                        }
+                        
+                        return res.json();
+                    })
+                    .then(data => {
+                        console.log('Server connectivity test result:', data);
+                        addSystemMessage(`Server connection established. Server status: ${data.status}`);
+                        showToast('Server connected successfully', 'success');
+                        
+                        // Reset direct API flag if it was set
+                        window.useDirectApi = false;
+                    })
+                    .catch(err => {
+                        console.error('Server connectivity test failed:', err);
+                        addSystemMessage(`Warning: Could not connect to server via .htaccess routing. API functionality may be limited. Error: ${err.message}`);
+                        showToast('Server connection failed', 'error');
+                        
+                        // Try direct API for Claude as a fallback
+                        addSystemMessage("Will use direct API access as fallback for Claude API calls.");
+                        
+                        // Update to use direct PHP instead of .htaccess routing
+                        window.useDirectApi = true;
+                    });
+            }
+        }
+        
+        // Function removed - no longer needed
+        function checkForHttpsRecommendation() {
+            // Not used in HTTP-only version
+            return;
+        }
+        
+        // Loading animation for the page
+        document.addEventListener('DOMContentLoaded', () => {
+            // HTTP-only version, no HTTPS checks needed
+            
+            // Add loading overlay
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'loading-overlay';
+            loadingOverlay.innerHTML = `
+                <div class="loading-spinner">
+                    <i class="fas fa-globe fa-spin"></i>
+                    <span>Loading Translator...</span>
+                </div>
+            `;
+            document.body.appendChild(loadingOverlay);
+            
+            // Add loading styles
+            const style = document.createElement('style');
+            style.textContent = `
+                .loading-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: var(--background-color);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 9999;
+                    opacity: 1;
+                    transition: opacity 0.5s ease;
+                }
+                .loading-spinner {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 20px;
+                    color: var(--primary-color);
+                }
+                .loading-spinner i {
+                    font-size: 4rem;
+                }
+                .loading-spinner span {
+                    font-size: 1.2rem;
+                    font-weight: 500;
+                    color: var(--text-primary);
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // Remove loading overlay after a delay
+            setTimeout(() => {
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    loadingOverlay.remove();
+                    
+                    // No HTTPS checks needed
+                }, 500);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
