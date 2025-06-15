@@ -111,11 +111,11 @@
         <p style="margin-bottom: 0.75rem; font-size: 0.9rem;">Or copy this link:</p>
         <div style="display: flex; margin-bottom: 1.5rem;">
             <input type="text" id="shareUrlInput" readonly style="flex: 1; padding: 0.75rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px 0 0 8px; font-size: 0.9rem;">
-            <button id="copyShareUrlBtn" class="btn" style="background-color: var(--primary-color); color: white; border-radius: 0 8px 8px 0; padding: 0 1rem;">
+            <button id="copyShareUrlBtn" class="btn" style="background-color: var(--primary-color); color: #838383; border-radius: 0 8px 8px 0; padding: 0 1rem;">
                 <i class="fas fa-copy"></i>
             </button>
         </div>
-        <button id="closeShareModalBtn" class="btn btn-primary" style="width: 100%;">Close</button>
+        <button id="closeShareModalBtn" class="btn btn-primary" style="width: 100%; background: var(--receiver-bg);">Close</button>
     </div>
 
     <!-- Modal Backdrop -->
@@ -193,7 +193,7 @@
         </div>
         <div class="settings-group">
             <h3>Summary Prompt</h3>
-            <textarea id="summaryPromptInput" rows="4" style="resize: vertical; font-size: 0.85rem; width: 100%;" placeholder="Customize the summary prompt here...">Please analyze the customer's messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.</textarea>
+            <textarea id="summaryPromptInput" rows="4" style="resize: vertical; font-size: 0.85rem; width: 100%;" placeholder="Customize the summary prompt here..."></textarea>
         </div>
         <div class="settings-group">
             <h3>Show System Messages (Receiver Mode)</h3>
@@ -1742,7 +1742,35 @@
         // Add content
         const contentElement = document.createElement('div');
         contentElement.classList.add('content');
-        contentElement.textContent = message.content;
+        
+        // For summary messages, add spacing before bullet points
+        if (message.sender === 'summary') {
+            const lines = message.content.split('\n');
+            let isFirstBullet = true;
+            
+            lines.forEach((line, index) => {
+                const trimmedLine = line.trim();
+                if (trimmedLine) {
+                    const p = document.createElement('p');
+                    p.textContent = trimmedLine;
+                    
+                    // Add extra top margin for bullet points (except the first one)
+                    if ((trimmedLine.startsWith('-') || trimmedLine.startsWith('•')) && !isFirstBullet) {
+                        p.style.marginTop = '0.8rem';
+                    }
+                    
+                    // Track if this is the first bullet point
+                    if (trimmedLine.startsWith('-') || trimmedLine.startsWith('•')) {
+                        isFirstBullet = false;
+                    }
+                    
+                    contentElement.appendChild(p);
+                }
+            });
+        } else {
+            contentElement.textContent = message.content;
+        }
+        
         messageElement.appendChild(contentElement);
         
         // Add copy button for summary messages
@@ -1878,7 +1906,7 @@
                         max-width: 100%;
                     }
                     .toast-info {
-                        background-color: var(--primary-color);
+                        background-color: var(--claude-bg);
                         border-left: 4px solid var(--primary-dark);
                     }
                     .toast-success {
@@ -2109,8 +2137,8 @@
             return;
         }
         
-        // Loading animation for the page
-        document.addEventListener('DOMContentLoaded', () => {
+      // Loading animation for the page
+      document.addEventListener('DOMContentLoaded', () => {
             // HTTP-only version, no HTTPS checks needed
             
             // Add loading overlay
@@ -2118,7 +2146,7 @@
             loadingOverlay.className = 'loading-overlay';
             loadingOverlay.innerHTML = `
                 <div class="loading-spinner">
-                    <i class="fas fa-globe fa-spin"></i>
+                    <img src="GGG_Wegweiser.png" alt="GGG Wegweiser Logo" class="loading-logo">
                     <span>Loading Translator...</span>
                 </div>
             `;
@@ -2148,13 +2176,19 @@
                     gap: 20px;
                     color: var(--primary-color);
                 }
-                .loading-spinner i {
-                    font-size: 4rem;
+                .loading-logo {
+                    height: 6rem;
+                    width: auto;
+                    animation: fadeInOut 2s ease-in-out infinite;
                 }
                 .loading-spinner span {
                     font-size: 1.2rem;
                     font-weight: 500;
                     color: var(--text-primary);
+                }
+                @keyframes fadeInOut {
+                    0%, 100% { opacity: 0.6; transform: scale(0.95); }
+                    50% { opacity: 1; transform: scale(1); }
                 }
             `;
             document.head.appendChild(style);

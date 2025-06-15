@@ -278,7 +278,7 @@ body::before {
     font-weight: 600;
     margin-bottom: 0.35rem;
     font-size: 0.85rem;
-    color: #ffffff;
+    color: #c8943a;
     display: flex;
     align-items: center;
     gap: 0.35rem;
@@ -286,6 +286,19 @@ body::before {
 
 .message .content {
     word-break: break-word;
+}
+
+/* Special formatting for summary message content */
+.summary-message .content {
+    white-space: pre-line;
+    line-height: 1.8;
+    margin-bottom: 3rem;
+}
+
+/* Paragraph styling for summary content */
+.summary-message .content p {
+    margin: 0;
+    line-height: 1.8;
 }
 
 .message::before {
@@ -298,7 +311,7 @@ body::before {
 
 .customer-message {
     align-self: flex-end;
-    background: var(--customer-bg);
+    background: linear-gradient(135deg, var(--customer-bg), #ce9736eb);
     /* border: 1px solid var(--customer-border); */
     margin-left: auto;
     color: white;
@@ -317,7 +330,7 @@ body::before {
 
 .claude-message {
     align-self: center;
-    background: var(--claude-bg);
+    background: linear-gradient(146deg, var(--claude-bg), #ab87795c);
     /* border: 1px solid var(--claude-border); */
     margin-left: auto;
     margin-right: auto;
@@ -338,15 +351,14 @@ body::before {
 
 .summary-message {
     align-self: center;
-    background-color: var(--summary-color);
+    background-color: #191e34;
     border-left: 3px solid var(--summary-border);
-    margin-left: auto;
-    margin-right: auto;
     width: 90%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     position: relative;
-    outline: 3px solid purple;
+    outline: 3px solid var(--customer-bg);
     outline-offset: 4px;
+    margin: 60px auto;
 }
 
 .copy-btn {
@@ -381,7 +393,7 @@ body::before {
 
 .receiver-message {
     align-self: flex-start;
-    background: var(--receiver-bg);
+    background: linear-gradient(146deg, var(--receiver-bg), #b83b52);
     /* border: 1px solid var(--receiver-border); */
     margin-right: auto;
     color: #ffffff;
@@ -455,9 +467,9 @@ body::before {
 
 .send-btn {
     padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    background: var(--receiver-bg);
     color: white;
-    border: 1px solid var(--primary-color);
+    /* border: 1px solid var(--primary-color); */
     border-radius: 12px;
     cursor: pointer;
     font-size: 0.95rem;
@@ -515,7 +527,7 @@ body::before {
 }
 
 .voice-btn {
-    background: linear-gradient(135deg, var(--success-color), #059669);
+    background: linear-gradient(135deg, var(--customer-bg), #d07070);
     color: white;
     border: 1px solid var(--success-color);
     border-radius: 12px;
