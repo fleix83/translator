@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #73937E;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .card {
+            background-color: #D54768;
+            border-radius: 12px;
+            padding: 40px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            text-decoration: none;
+            color: white;
+            display: block;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .card-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <a href="https://www.luminelli.ch/einsatzplan" class="card">
+            <div class="card-icon">📋</div>
+            <div class="card-title">Einsatzplan</div>
+        </a>
+
+        <a href="https://www.luminelli.ch/translator" class="card">
+            <div class="card-icon">🌐</div>
+            <div class="card-title">Translator</div>
+        </a>
+
+        <a href="https://www.luminelli.ch/filetransfer" class="card">
+            <div class="card-icon">📁</div>
+            <div class="card-title">File Exchange</div>
+        </a>
+    </div>
+</body>
+</html>
