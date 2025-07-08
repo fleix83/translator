@@ -179,7 +179,15 @@
         </div>
         <div class="settings-group">
             <h3>Claude API Key</h3>
-            <input type="password" id="apiKeyInput" placeholder="Enter your Claude API key">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="password" id="apiKeyInput" placeholder="Enter your Claude API key" style="flex: 1;">
+                <button id="saveGlobalApiKeyBtn" class="btn" title="Save as global default for all sessions">
+                    <i class="fas fa-globe"></i> Global
+                </button>
+            </div>
+            <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Save globally to use this API key as default for all new sessions
+            </small>
         </div>
         <div class="settings-group">
             <h3>Claude API Model</h3>
@@ -193,7 +201,18 @@
         </div>
         <div class="settings-group">
             <h3>Summary Prompt</h3>
-            <textarea id="summaryPromptInput" rows="4" style="resize: vertical; font-size: 0.85rem; width: 100%;" placeholder="Customize the summary prompt here..."></textarea>
+            <textarea id="summaryPromptInput" rows="4" style="resize: vertical; font-size: 0.85rem; width: 100%; margin-bottom: 0.5rem;" placeholder="Customize the summary prompt here..."></textarea>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button id="saveGlobalSummaryBtn" class="btn" title="Save as global default for all sessions">
+                    <i class="fas fa-globe"></i> Save Global Default
+                </button>
+                <button id="resetSummaryBtn" class="btn" style="background-color: var(--warning-color); color: white; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem;" title="Reset to global default">
+                    <i class="fas fa-undo"></i> Reset
+                </button>
+            </div>
+            <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Global default will be used for all new sessions
+            </small>
         </div>
         <div class="settings-group">
             <h3>Show System Messages (Receiver Mode)</h3>
@@ -508,6 +527,373 @@
             }
         }
 
+        // Global Settings Manager Class for Supabase
+        class GlobalSettingsManager {
+            constructor(supabaseUrl, supabaseKey) {
+                this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
+                this.settingsCache = new Map();
+                this.isInitialized = false;
+            }
+
+            async initializeSettings() {
+                if (this.isInitialized) return true;
+                
+                try {
+                    console.log('Initializing global settings...');
+                    
+                    // Load all global settings from database
+                    const { data, error } = await this.supabase
+                        .from('global_settings')
+                        .select('*')
+                        .eq('is_active', true);
+
+                    if (error) {
+                        console.error('Error loading global settings:', error);
+                        throw error;
+                    }
+
+                    // Cache the settings (decrypt API keys)
+                    if (data && data.length > 0) {
+                        for (const setting of data) {
+                            let settingValue = setting.setting_value;
+                            
+                            // Decrypt API keys when loading
+                            if (setting.setting_key === 'default_api_key' && settingValue && settingValue.trim() !== '') {
+                                if (encryption.isEncrypted(settingValue)) {
+                                    try {
+                                        settingValue = await encryption.decryptText(settingValue);
+                                        console.log('API key decrypted during initialization');
+                                    } catch (error) {
+                                        console.error('Failed to decrypt API key during initialization:', error);
+                                        // Keep the encrypted value if decryption fails
+                                    }
+                                }
+                            }
+                            
+                            this.settingsCache.set(setting.setting_key, settingValue);
+                        }
+                        console.log('Global settings loaded and decrypted:', this.settingsCache.size, 'settings');
+                    }
+
+                    this.isInitialized = true;
+                    return true;
+                } catch (error) {
+                    console.error('Failed to initialize global settings:', error);
+                    showToast('Failed to load global settings: ' + error.message, 'warning');
+                    return false;
+                }
+            }
+
+            async getSetting(key, defaultValue = null) {
+                if (!this.isInitialized) {
+                    await this.initializeSettings();
+                }
+
+                const cachedValue = this.settingsCache.get(key);
+                if (cachedValue !== undefined) {
+                    return cachedValue;
+                }
+
+                // If not in cache, try to load from database
+                try {
+                    const { data, error } = await this.supabase
+                        .from('global_settings')
+                        .select('setting_value')
+                        .eq('setting_key', key)
+                        .eq('is_active', true)
+                        .single();
+
+                    if (error) {
+                        console.warn(`Setting '${key}' not found in database:`, error);
+                        return defaultValue;
+                    }
+
+                    let settingValue = data.setting_value;
+                    
+                    // Decrypt API keys when loading
+                    if (key === 'default_api_key' && settingValue && settingValue.trim() !== '') {
+                        // Check if the value appears to be encrypted
+                        if (encryption.isEncrypted(settingValue)) {
+                            settingValue = await encryption.decryptText(settingValue);
+                            console.log('API key decrypted from storage');
+                        }
+                    }
+
+                    // Cache the decrypted value
+                    this.settingsCache.set(key, settingValue);
+                    return settingValue;
+                } catch (error) {
+                    console.error(`Error getting setting '${key}':`, error);
+                    return defaultValue;
+                }
+            }
+
+            async setSetting(key, value, description = null) {
+                try {
+                    console.log(`Setting global setting '${key}' to:`, key === 'default_api_key' ? '[ENCRYPTED]' : value);
+                    
+                    // Encrypt API keys before storing
+                    let valueToStore = value;
+                    if (key === 'default_api_key' && value && value.trim() !== '') {
+                        valueToStore = await encryption.encryptText(value);
+                        console.log('API key encrypted for storage');
+                    }
+                    
+                    const settingData = {
+                        setting_key: key,
+                        setting_value: valueToStore,
+                        updated_at: new Date().toISOString()
+                    };
+
+                    if (description) {
+                        settingData.description = description;
+                    }
+
+                    const { data, error } = await this.supabase
+                        .from('global_settings')
+                        .upsert(settingData, {
+                            onConflict: 'setting_key',
+                            ignoreDuplicates: false
+                        })
+                        .select();
+
+                    if (error) {
+                        console.error(`Error setting '${key}':`, error);
+                        throw error;
+                    }
+
+                    // Update cache with original (unencrypted) value
+                    this.settingsCache.set(key, value);
+                    console.log(`Global setting '${key}' updated successfully`);
+                    return true;
+                } catch (error) {
+                    console.error(`Failed to set global setting '${key}':`, error);
+                    showToast(`Failed to save global setting: ${error.message}`, 'error');
+                    return false;
+                }
+            }
+
+            async getAllSettings() {
+                if (!this.isInitialized) {
+                    await this.initializeSettings();
+                }
+
+                try {
+                    const { data, error } = await this.supabase
+                        .from('global_settings')
+                        .select('*')
+                        .eq('is_active', true)
+                        .order('setting_key');
+
+                    if (error) {
+                        console.error('Error getting all settings:', error);
+                        throw error;
+                    }
+
+                    return data || [];
+                } catch (error) {
+                    console.error('Failed to get all settings:', error);
+                    return [];
+                }
+            }
+
+            async createDefaultSettings() {
+                try {
+                    console.log('Creating default global settings...');
+                    
+                    const defaultSettings = [
+                        {
+                            setting_key: 'default_api_key',
+                            setting_value: '',
+                            description: 'Default Claude API key for all sessions'
+                        },
+                        {
+                            setting_key: 'default_summary_prompt',
+                            setting_value: 'Please analyze the customer\'s messages in this conversation and provide a concise summary of key information, requests, concerns, and any action items. Include important details like dates, quantities, or specific references. Format your response as a clear, bulleted list in the base language.',
+                            description: 'Default summary prompt for conversation summaries'
+                        },
+                        {
+                            setting_key: 'default_model',
+                            setting_value: 'claude-3-haiku-20240307',
+                            description: 'Default Claude model to use'
+                        },
+                        {
+                            setting_key: 'default_customer_language',
+                            setting_value: 'fr',
+                            description: 'Default customer language'
+                        },
+                        {
+                            setting_key: 'default_base_language',
+                            setting_value: 'de',
+                            description: 'Default base language'
+                        }
+                    ];
+
+                    for (const setting of defaultSettings) {
+                        await this.setSetting(setting.setting_key, setting.setting_value, setting.description);
+                    }
+
+                    console.log('Default global settings created successfully');
+                    return true;
+                } catch (error) {
+                    console.error('Failed to create default settings:', error);
+                    return false;
+                }
+            }
+
+            getCachedSetting(key, defaultValue = null) {
+                return this.settingsCache.get(key) || defaultValue;
+            }
+
+            async testConnection() {
+                try {
+                    console.log('Testing global settings database connection...');
+                    
+                    const { data, error } = await this.supabase
+                        .from('global_settings')
+                        .select('count(*)', { count: 'exact', head: true });
+
+                    if (error) {
+                        console.error('Global settings connection test failed:', error);
+                        showToast('Global settings connection failed: ' + error.message, 'error');
+                        return false;
+                    } else {
+                        console.log('Global settings connection successful');
+                        return true;
+                    }
+                } catch (error) {
+                    console.error('Global settings connection test error:', error);
+                    return false;
+                }
+            }
+        }
+
+        // Simple Encryption Utilities for API Keys
+        class SimpleEncryption {
+            constructor() {
+                // Use a derived key from the session token and domain for simple encryption
+                this.keyMaterial = null;
+            }
+
+            async initializeKey() {
+                if (this.keyMaterial) return;
+                
+                try {
+                    // Create a deterministic key from domain and a fixed salt
+                    const keySource = window.location.hostname + '_translator_key_salt_2024';
+                    const encoder = new TextEncoder();
+                    const keyData = encoder.encode(keySource);
+                    
+                    // Import key material
+                    this.keyMaterial = await crypto.subtle.importKey(
+                        'raw',
+                        keyData,
+                        { name: 'PBKDF2' },
+                        false,
+                        ['deriveKey']
+                    );
+                } catch (error) {
+                    console.error('Failed to initialize encryption key:', error);
+                    throw error;
+                }
+            }
+
+            async deriveKey() {
+                await this.initializeKey();
+                
+                const salt = new Uint8Array(16);
+                // Use a deterministic salt for simplicity
+                salt.fill(42);
+                
+                return crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    this.keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+            }
+
+            async encryptText(plaintext) {
+                if (!plaintext || plaintext.trim() === '') {
+                    return plaintext; // Don't encrypt empty strings
+                }
+
+                try {
+                    const key = await this.deriveKey();
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(plaintext);
+                    
+                    // Generate random IV
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    
+                    const encrypted = await crypto.subtle.encrypt(
+                        { name: 'AES-GCM', iv: iv },
+                        key,
+                        data
+                    );
+                    
+                    // Combine IV and encrypted data
+                    const combined = new Uint8Array(iv.length + encrypted.byteLength);
+                    combined.set(iv);
+                    combined.set(new Uint8Array(encrypted), iv.length);
+                    
+                    // Convert to base64 for storage
+                    return btoa(String.fromCharCode.apply(null, combined));
+                } catch (error) {
+                    console.error('Encryption failed:', error);
+                    return plaintext; // Fallback to plaintext
+                }
+            }
+
+            async decryptText(encryptedBase64) {
+                if (!encryptedBase64 || encryptedBase64.trim() === '') {
+                    return encryptedBase64; // Return empty strings as-is
+                }
+
+                try {
+                    const key = await this.deriveKey();
+                    
+                    // Convert from base64
+                    const combined = new Uint8Array(
+                        atob(encryptedBase64).split('').map(char => char.charCodeAt(0))
+                    );
+                    
+                    // Extract IV and encrypted data
+                    const iv = combined.slice(0, 12);
+                    const encrypted = combined.slice(12);
+                    
+                    const decrypted = await crypto.subtle.decrypt(
+                        { name: 'AES-GCM', iv: iv },
+                        key,
+                        encrypted
+                    );
+                    
+                    const decoder = new TextDecoder();
+                    return decoder.decode(decrypted);
+                } catch (error) {
+                    console.error('Decryption failed:', error);
+                    // If decryption fails, assume it's plaintext (backward compatibility)
+                    return encryptedBase64;
+                }
+            }
+
+            // Helper method to check if a string appears to be encrypted
+            isEncrypted(text) {
+                if (!text || text.length < 20) return false;
+                // Simple heuristic: base64 strings are typically longer and contain +/= chars
+                return /^[A-Za-z0-9+/]+=*$/.test(text) && text.length > 30;
+            }
+        }
+
+        // Global encryption instance
+        const encryption = new SimpleEncryption();
+
         // Initialize chat function
         async function initializeChat(sessionToken) {
             try {
@@ -607,8 +993,9 @@
             return window.innerWidth < 768 ? 'customer' : 'receiver';
         }
 
-        // Global chat manager instance
+        // Global manager instances
         let globalChatManager = null;
+        let globalSettingsManager = null;
 
         // Token management functions
         function generateSessionToken() {
@@ -642,9 +1029,30 @@
         // Get URL parameters for settings
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Save API key from URL to localStorage if it exists
-        if (urlParams.get('apiKey')) {
-            localStorage.setItem('claudeApiKey', urlParams.get('apiKey'));
+        // Helper function to get decrypted API key from localStorage
+        async function getDecryptedApiKeyFromStorage() {
+            const storedKey = localStorage.getItem('claudeApiKey');
+            if (!storedKey) return '';
+            
+            try {
+                // Check if the stored key appears to be encrypted
+                if (encryption.isEncrypted(storedKey)) {
+                    return await encryption.decryptText(storedKey);
+                } else {
+                    // If not encrypted, return as-is (backward compatibility)
+                    return storedKey;
+                }
+            } catch (error) {
+                console.error('Failed to decrypt stored API key:', error);
+                return storedKey; // Return as-is if decryption fails
+            }
+        }
+        
+        // Temporarily store URL API key if it exists (will encrypt it later in DOMContentLoaded)
+        const urlApiKey = urlParams.get('apiKey');
+        if (urlApiKey) {
+            // For now, just store it temporarily - we'll encrypt it in the async initialization
+            localStorage.setItem('claudeApiKey_temp', urlApiKey);
         }
         
         // App state
@@ -652,7 +1060,7 @@
             userMode: detectDeviceType(), // Auto-detect initial mode
             customerLanguage: urlParams.get('customerLang') || 'fr',
             baseLanguage: urlParams.get('baseLang') || 'de',
-            apiKey: urlParams.get('apiKey') || localStorage.getItem('claudeApiKey') || '',
+            apiKey: urlParams.get('apiKey') || '',
             model: 'claude-3-haiku-20240307', // Use Claude 3 Haiku which is known to work with the API key
             messages: [],
             autoModeDetection: true, // Flag to enable/disable auto detection
@@ -662,9 +1070,70 @@
             sessionUpdated: Date.now() // Timestamp for expiry tracking
         };
 
-        // Initialize chat manager after DOM is loaded
+        // Initialize managers after DOM is loaded
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                // Handle API key initialization and encryption
+                let finalApiKey = '';
+                
+                // Check if there's a URL API key to encrypt and store
+                const tempUrlKey = localStorage.getItem('claudeApiKey_temp');
+                if (tempUrlKey) {
+                    try {
+                        const encryptedUrlKey = await encryption.encryptText(tempUrlKey);
+                        localStorage.setItem('claudeApiKey', encryptedUrlKey);
+                        localStorage.removeItem('claudeApiKey_temp');
+                        finalApiKey = tempUrlKey;
+                        console.log('URL API key encrypted and stored');
+                    } catch (error) {
+                        console.error('Failed to encrypt URL API key:', error);
+                        localStorage.setItem('claudeApiKey', tempUrlKey);
+                        localStorage.removeItem('claudeApiKey_temp');
+                        finalApiKey = tempUrlKey;
+                    }
+                } else if (!urlParams.get('apiKey')) {
+                    // No URL key, try to decrypt stored key
+                    finalApiKey = await getDecryptedApiKeyFromStorage();
+                } else {
+                    // URL key is already in state
+                    finalApiKey = state.apiKey;
+                }
+                
+                // Update state and UI
+                if (finalApiKey) {
+                    state.apiKey = finalApiKey;
+                    apiKeyInput.value = finalApiKey;
+                }
+                
+                // Initialize global settings manager first
+                console.log('Initializing global settings manager...');
+                if (SUPABASE_URL !== 'your-supabase-url-here' && SUPABASE_ANON_KEY !== 'your-supabase-anon-key-here') {
+                    globalSettingsManager = new GlobalSettingsManager(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    
+                    // Test connection first
+                    const connectionOk = await globalSettingsManager.testConnection();
+                    if (connectionOk) {
+                        await globalSettingsManager.initializeSettings();
+                        
+                        // Check if we need to create default settings
+                        const allSettings = await globalSettingsManager.getAllSettings();
+                        if (allSettings.length === 0) {
+                            console.log('No global settings found, creating defaults...');
+                            await globalSettingsManager.createDefaultSettings();
+                            showToast('Default global settings created', 'info');
+                        }
+                        
+                        // Load global settings and apply them to state
+                        await loadGlobalSettings();
+                        console.log('Global settings manager initialized successfully!');
+                    } else {
+                        console.log('Global settings database not accessible - running without global settings');
+                    }
+                } else {
+                    console.log('Global settings manager not initialized - Supabase not configured');
+                }
+
+                // Initialize chat manager
                 console.log('Initializing chat manager...');
                 globalChatManager = await initializeChat(sessionToken);
                 if (globalChatManager) {
@@ -673,9 +1142,87 @@
                     console.log('Chat manager not initialized - running in local mode');
                 }
             } catch (error) {
-                console.error('Failed to initialize chat manager:', error);
+                console.error('Failed to initialize managers:', error);
             }
         });
+
+        // Function to load global settings and apply them to state
+        async function loadGlobalSettings() {
+            if (!globalSettingsManager) return;
+            
+            try {
+                console.log('Loading global settings...');
+                
+                // Get global settings with fallbacks
+                const globalApiKey = await globalSettingsManager.getSetting('default_api_key', '');
+                const globalSummaryPrompt = await globalSettingsManager.getSetting('default_summary_prompt', state.summaryPrompt);
+                const globalModel = await globalSettingsManager.getSetting('default_model', 'claude-3-haiku-20240307');
+                const globalCustomerLang = await globalSettingsManager.getSetting('default_customer_language', 'fr');
+                const globalBaseLang = await globalSettingsManager.getSetting('default_base_language', 'de');
+                
+                // Apply settings hierarchy: URL params > localStorage > Global settings > Default
+                
+                // API Key: URL > localStorage > Global
+                if (!urlParams.get('apiKey') && !localStorage.getItem('claudeApiKey') && globalApiKey) {
+                    state.apiKey = globalApiKey;
+                    apiKeyInput.value = globalApiKey;
+                }
+                
+                // Summary Prompt: Global overrides default
+                if (globalSummaryPrompt !== state.summaryPrompt) {
+                    state.summaryPrompt = globalSummaryPrompt;
+                    if (summaryPromptInput) {
+                        summaryPromptInput.value = globalSummaryPrompt;
+                    }
+                }
+                
+                // Model: Global overrides default
+                if (globalModel) {
+                    state.model = globalModel;
+                    modelSelect.value = globalModel;
+                }
+                
+                // Languages: URL > localStorage > Global
+                if (!urlParams.get('customerLang')) {
+                    // Check if we have saved local settings
+                    const savedSettings = localStorage.getItem(getStorageKey('settings'));
+                    if (!savedSettings && globalCustomerLang) {
+                        state.customerLanguage = globalCustomerLang;
+                        customerLanguageSelect.value = globalCustomerLang;
+                    }
+                }
+                
+                if (!urlParams.get('baseLang')) {
+                    const savedSettings = localStorage.getItem(getStorageKey('settings'));
+                    if (!savedSettings && globalBaseLang) {
+                        state.baseLanguage = globalBaseLang;
+                        baseLanguageSelect.value = globalBaseLang;
+                    }
+                }
+                
+                console.log('Global settings applied to state:', {
+                    apiKey: state.apiKey ? 'SET' : 'NOT_SET',
+                    summaryPrompt: state.summaryPrompt.substring(0, 50) + '...',
+                    model: state.model,
+                    customerLanguage: state.customerLanguage,
+                    baseLanguage: state.baseLanguage
+                });
+                
+            } catch (error) {
+                console.error('Failed to load global settings:', error);
+                showToast('Failed to load global settings', 'warning');
+            }
+        }
+
+        // Function to save setting to global database
+        async function saveGlobalSetting(key, value) {
+            if (!globalSettingsManager) {
+                console.warn('Global settings manager not available');
+                return false;
+            }
+            
+            return await globalSettingsManager.setSetting(key, value);
+        }
 
         // Function to create prefixed localStorage keys
         function getStorageKey(key) {
@@ -1131,13 +1678,27 @@
             saveSettings();
         });
 
-        apiKeyInput.addEventListener('change', (e) => {
+        apiKeyInput.addEventListener('change', async (e) => {
             state.apiKey = e.target.value;
-            localStorage.setItem('claudeApiKey', state.apiKey);
+            
+            // Encrypt API key before storing in localStorage
+            if (state.apiKey && state.apiKey.trim() !== '') {
+                try {
+                    const encryptedKey = await encryption.encryptText(state.apiKey);
+                    localStorage.setItem('claudeApiKey', encryptedKey);
+                } catch (error) {
+                    console.error('Failed to encrypt API key for localStorage:', error);
+                    // Fallback to storing unencrypted
+                    localStorage.setItem('claudeApiKey', state.apiKey);
+                }
+            } else {
+                localStorage.removeItem('claudeApiKey');
+            }
+            
             saveSettings();
             
             if (state.apiKey) {
-                showToast('API key saved', 'success');
+                showToast('API key saved (encrypted)', 'success');
             } else {
                 showToast('API key removed', 'warning');
             }
@@ -1163,6 +1724,46 @@
         if (summaryBtn) {
             summaryBtn.addEventListener('click', generateConversationSummary);
         }
+
+        // Global settings button listeners
+        document.getElementById('saveGlobalApiKeyBtn').addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                showToast('Please enter an API key first', 'warning');
+                return;
+            }
+            
+            const success = await saveGlobalSetting('default_api_key', apiKey);
+            if (success) {
+                showToast('API key saved globally', 'success');
+            }
+        });
+
+        document.getElementById('saveGlobalSummaryBtn').addEventListener('click', async () => {
+            const summaryPrompt = summaryPromptInput.value.trim();
+            if (!summaryPrompt) {
+                showToast('Please enter a summary prompt first', 'warning');
+                return;
+            }
+            
+            const success = await saveGlobalSetting('default_summary_prompt', summaryPrompt);
+            if (success) {
+                showToast('Summary prompt saved globally', 'success');
+            }
+        });
+
+        document.getElementById('resetSummaryBtn').addEventListener('click', async () => {
+            if (!globalSettingsManager) {
+                showToast('Global settings not available', 'warning');
+                return;
+            }
+            
+            const globalPrompt = await globalSettingsManager.getSetting('default_summary_prompt', state.summaryPrompt);
+            summaryPromptInput.value = globalPrompt;
+            state.summaryPrompt = globalPrompt;
+            saveSettings();
+            showToast('Summary prompt reset to global default', 'info');
+        });
 
         // Customer name input listener
         if (document.getElementById('customerNameInput')) {
@@ -1255,7 +1856,8 @@
                         'hi': 'hi-IN',
                         'sr': 'sr-RS',
                         'sq': 'sq-AL',
-                        'uk': 'uk-UA'
+                        'uk': 'uk-UA',
+                        'tr': 'tr-TR'
                     };
                     langCode = langMap[state.customerLanguage] || 'en-US';
                 } else {
@@ -1267,7 +1869,8 @@
                         'de': 'de-DE',
                         'sr': 'sr-RS',
                         'sq': 'sq-AL',
-                        'uk': 'uk-UA'
+                        'uk': 'uk-UA',
+                        'tr': 'tr-TR'
                     };
                     langCode = langMap[state.baseLanguage] || 'en-US';
                 }
@@ -1838,7 +2441,8 @@
                 'hi': 'Hindi',
                 'sr': 'Serbian',
                 'sq': 'Albanian',
-                'uk': 'Ukrainian'
+                'uk': 'Ukrainian',
+                'tr': 'Turkish'
             };
             return languages[langCode] || langCode;
         }

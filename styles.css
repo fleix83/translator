@@ -966,3 +966,21 @@ input:checked + .toggle-slider:before {
     background-color: #94a3b8;
     transform: none;
 }
+
+#saveGlobalApiKeyBtn {
+    background-color: var(--receiver-bg);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+#saveGlobalSummaryBtn {
+    background-color: var(--receiver-bg);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;  
+}
